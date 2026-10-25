@@ -1,0 +1,44 @@
+MIT License
+
+Copyright (c) 2026 星陨斩杀线 contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Third-party notices
+
+### roco-star-dmg（数值内核与图鉴数据）
+
+- 项目：https://github.com/Bartzh/roco-star-dmg
+- 许可：WTFPL（见上游仓库 LICENSE）
+- 使用方式：src/core/calc-core.js 由 tools/extract-core.mjs 从上游 calculator.js 按行段
+  逐字抽取生成（不重新推导公式）；src/data/roco-data.js 由上游 datas/final/*.json 打包而成。
+  本仓库不修改上游数值逻辑。
+
+### BWiki 数据（精灵 / 技能 / 属性）
+
+- 来源：https://wiki.biligame.com/nrc/
+- 许可：CC BY-NC-SA 4.0
+- 说明：图鉴数据经上游项目整理后进入本仓库，仅用于非商业用途。
+
+### Electron / Chromium
+
+- 打包产物内含 Electron 运行时，遵循其各自许可（MIT / BSD 等），
+  详见打包目录内的 LICENSE 与 LICENSES.chromium.html。

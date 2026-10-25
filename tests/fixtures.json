@@ -1,0 +1,2903 @@
+{
+  "meta": {
+    "generatedAt": "2026-10-24T15:57:45.086Z",
+    "generator": "tests/gen-fixtures.mjs",
+    "oracle": {
+      "page": "http://127.0.0.1:8765/calculator.html",
+      "upstreamGit": "5e67e1f",
+      "dataDir": "_intermediates/upstream/datas/final",
+      "counts": {
+        "sprites": 622,
+        "skills": 824,
+        "types": 18,
+        "yuanli": 18
+      },
+      "fn": "computeFinalDamage(ctx) @ calculator.js:3948"
+    },
+    "targetTiers": {
+      "t1": {
+        "key": "t1",
+        "label": "档①性格生命+生命防御",
+        "nature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "ivs": [
+          "hp",
+          "def",
+          "mdef"
+        ]
+      },
+      "t2": {
+        "key": "t2",
+        "label": "档②仅生命防御",
+        "nature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "ivs": [
+          "hp",
+          "def",
+          "mdef"
+        ]
+      },
+      "t3": {
+        "key": "t3",
+        "label": "档③仅生命",
+        "nature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "ivs": [
+          "hp"
+        ]
+      }
+    },
+    "attackerProfiles": {
+      "phys": {
+        "nature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "ivs": [
+          "atk",
+          "hp",
+          "spd"
+        ]
+      },
+      "magic": {
+        "nature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "ivs": [
+          "matk",
+          "hp",
+          "spd"
+        ]
+      },
+      "speed": {
+        "nature": {
+          "up": "spd",
+          "down": "def"
+        },
+        "ivs": [
+          "spd",
+          "atk",
+          "matk"
+        ]
+      }
+    },
+    "caseCount": 48,
+    "tagCount": {
+      "物攻": 6,
+      "STAB": 11,
+      "相性1": 5,
+      "无STAB": 5,
+      "相性0.5": 4,
+      "0层": 2,
+      "相性3": 2,
+      "连击2": 2,
+      "档③": 3,
+      "魔攻": 5,
+      "自适应": 3,
+      "物攻路径": 1,
+      "魔攻路径": 1,
+      "应对状态": 5,
+      "相性2": 3,
+      "相性0.25": 1,
+      "连击3": 2,
+      "连击": 2,
+      "特性mod": 5,
+      "坠星": 1,
+      "和弦共振": 1,
+      "技能mod": 1,
+      "powerAdd": 1,
+      "powerMult2": 1,
+      "连击翻倍": 1,
+      "powerMult2.5": 1,
+      "ignoreResist": 1,
+      "防御技能": 2,
+      "chip": 2,
+      "威力": 1,
+      "需多层": 5,
+      "minKill=13": 2,
+      "scan-medium": 2,
+      "临界未斩": 5,
+      "0层即斩": 1,
+      "scan-fast": 1,
+      "minKill=22": 2,
+      "scan-weak-magic": 2,
+      "minKill=11": 2,
+      "scan-bulky": 2,
+      "minKill=5": 2,
+      "scan-low-tier": 2,
+      "minKill=20": 2,
+      "scan-combo-mod": 2,
+      "不可斩": 2,
+      "scan-unkillable-phantom": 1,
+      "scan-unkillable-extreme": 1
+    },
+    "scanSummary": [
+      {
+        "id": "scan-medium",
+        "note": "中坚物攻打档①",
+        "minKillLayer": 13
+      },
+      {
+        "id": "scan-fast",
+        "note": "双克制物攻，可能 0 层即斩",
+        "minKillLayer": 0
+      },
+      {
+        "id": "scan-weak-magic",
+        "note": "低魔攻打高特防，预期不可斩",
+        "minKillLayer": 22
+      },
+      {
+        "id": "scan-bulky",
+        "note": "高 HP 火系靶子",
+        "minKillLayer": 11
+      },
+      {
+        "id": "scan-low-tier",
+        "note": "档③低血量靶子",
+        "minKillLayer": 5
+      },
+      {
+        "id": "scan-combo-mod",
+        "note": "多维击打高连击成长",
+        "minKillLayer": 20
+      },
+      {
+        "id": "scan-unkillable-phantom",
+        "note": "离心舞者念力膨胀（幻系，无星陨伤害）打飞飞钥档①",
+        "minKillLayer": null
+      },
+      {
+        "id": "scan-unkillable-extreme",
+        "note": "空空颅多维击打（幻系魔攻 p15）对最高血量档①，极端不可斩",
+        "minKillLayer": null
+      }
+    ],
+    "compareFields": [
+      "finalDamage",
+      "skillDmg",
+      "starDmg",
+      "defHP"
+    ],
+    "diagnosticFields": [
+      "starPower",
+      "stab",
+      "skillEff",
+      "skillEffRaw",
+      "starEff",
+      "combo",
+      "isMagic",
+      "atkStat",
+      "defStat",
+      "isKill",
+      "starTriggered",
+      "isSkillIllusion"
+    ]
+  },
+  "cases": [
+    {
+      "index": 0,
+      "id": "phys-stab-evil",
+      "tags": [
+        "物攻",
+        "STAB",
+        "相性1"
+      ],
+      "note": "恶系物攻 STAB 打 机械+火",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "彼岸之手",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 3,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 281,
+        "skillDmg": 244,
+        "starDmg": 37,
+        "defHP": 514,
+        "starPower": 57,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 1,
+      "id": "phys-no-stab-dragon",
+      "tags": [
+        "物攻",
+        "无STAB",
+        "相性0.5"
+      ],
+      "note": "恶系精灵打龙系技能，无 STAB",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "吹炎",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 3,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 147,
+        "skillDmg": 110,
+        "starDmg": 37,
+        "defHP": 514,
+        "starPower": 57,
+        "stab": 1,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 2,
+      "id": "phys-default-bat-zero",
+      "tags": [
+        "物攻",
+        "STAB",
+        "0层"
+      ],
+      "note": "规格示例技能 蝙蝠，0 层",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "蝙蝠",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 0,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 105,
+        "skillDmg": 105,
+        "starDmg": 0,
+        "defHP": 514,
+        "starPower": -24,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 3,
+      "id": "phys-eff3-fire",
+      "tags": [
+        "物攻",
+        "STAB",
+        "相性3"
+      ],
+      "note": "火系物攻双克制 机械+虫",
+      "origin": "static",
+      "req": {
+        "attackerId": "音速犬",
+        "skillId": "火云车",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 2,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 632,
+        "skillDmg": 616,
+        "starDmg": 16,
+        "defHP": 543,
+        "starPower": 28,
+        "stab": 1.25,
+        "skillEff": 3,
+        "skillEffRaw": 3,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 255,
+        "defStat": 196,
+        "isKill": true,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 89
+      }
+    },
+    {
+      "index": 4,
+      "id": "phys-combo2",
+      "tags": [
+        "物攻",
+        "连击2",
+        "无STAB"
+      ],
+      "note": "2 连击技能基础值",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "连续爪击",
+        "defenderId": "窃光蚊",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 4,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 147,
+        "skillDmg": 85,
+        "starDmg": 62,
+        "defHP": 379,
+        "starPower": 88,
+        "stab": 1,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 2,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 171,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 5,
+      "id": "phys-extreme",
+      "tags": [
+        "物攻",
+        "STAB",
+        "相性1",
+        "档③"
+      ],
+      "note": "档③只有生命加点",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "极限撕裂",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp"
+        ],
+        "starLayer": 1,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 266,
+        "skillDmg": 266,
+        "starDmg": 0,
+        "defHP": 445,
+        "starPower": 1,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 154,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 6,
+      "id": "magic-stab-phantom",
+      "tags": [
+        "魔攻",
+        "STAB",
+        "相性0.5"
+      ],
+      "note": "幻系魔攻被机械+火抵抗",
+      "origin": "static",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "大爆炸",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 5,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 55,
+        "skillDmg": 55,
+        "starDmg": 0,
+        "defHP": 514,
+        "starPower": 121,
+        "stab": 1.25,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 272,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 7,
+      "id": "magic-no-stab-normal",
+      "tags": [
+        "魔攻",
+        "无STAB",
+        "相性0.5"
+      ],
+      "note": "普通系魔攻无 STAB",
+      "origin": "static",
+      "req": {
+        "attackerId": "粉耳星兔",
+        "skillId": "音爆",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 5,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 123,
+        "skillDmg": 64,
+        "starDmg": 59,
+        "defHP": 514,
+        "starPower": 121,
+        "stab": 1,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 297,
+        "defStat": 272,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 8,
+      "id": "magic-dragon",
+      "tags": [
+        "魔攻",
+        "无STAB",
+        "相性1"
+      ],
+      "note": "高威力龙系魔攻",
+      "origin": "static",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "升龙咆哮",
+        "defenderId": "燃薪虫",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 4,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 400,
+        "skillDmg": 278,
+        "starDmg": 122,
+        "defHP": 521,
+        "starPower": 88,
+        "stab": 1,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 173,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 9,
+      "id": "magic-stab-eff1",
+      "tags": [
+        "魔攻",
+        "STAB",
+        "相性1"
+      ],
+      "note": "幻系魔攻对地+翼中性",
+      "origin": "static",
+      "req": {
+        "attackerId": "暮星辰",
+        "skillId": "四维降解",
+        "defenderId": "泥吼牙",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 6,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 158,
+        "skillDmg": 158,
+        "starDmg": 0,
+        "defHP": 432,
+        "starPower": 156,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 242,
+        "defStat": 190,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 10,
+      "id": "magic-high-matk",
+      "tags": [
+        "魔攻",
+        "STAB",
+        "档③"
+      ],
+      "note": "高魔攻精灵打档③",
+      "origin": "static",
+      "req": {
+        "attackerId": "粉耳星兔",
+        "skillId": "大爆炸",
+        "defenderId": "燃薪虫",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp"
+        ],
+        "starLayer": 2,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 239,
+        "skillDmg": 239,
+        "starDmg": 0,
+        "defHP": 451,
+        "starPower": 28,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 297,
+        "defStat": 140,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 11,
+      "id": "adaptive-phys-path",
+      "tags": [
+        "自适应",
+        "物攻路径",
+        "STAB"
+      ],
+      "note": "物攻 127 > 魔攻 57，走物攻；恶 vs 机械火 = 1",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "__yuanli_恶__",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 4,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 187,
+        "skillDmg": 130,
+        "starDmg": 57,
+        "defHP": 514,
+        "starPower": 88,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 12,
+      "id": "adaptive-magic-path",
+      "tags": [
+        "自适应",
+        "魔攻路径",
+        "STAB"
+      ],
+      "note": "魔攻 125 > 物攻 61，走魔攻",
+      "origin": "static",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "__yuanli_幻__",
+        "defenderId": "泥吼牙",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 5,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 126,
+        "skillDmg": 126,
+        "starDmg": 0,
+        "defHP": 498,
+        "starPower": 121,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 190,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 13,
+      "id": "adaptive-state-25",
+      "tags": [
+        "自适应",
+        "应对状态",
+        "相性2"
+      ],
+      "note": "愿力冲击 + 聚能：威力 ×2.5，地 vs 水+电 = 2",
+      "origin": "static",
+      "req": {
+        "attackerId": "祭礼巨像",
+        "skillId": "__yuanli_地__",
+        "defenderId": "利灯鱼",
+        "defenseSkillId": "__state__",
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 2,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 697,
+        "skillDmg": 671,
+        "starDmg": 26,
+        "defHP": 506,
+        "starPower": 28,
+        "stab": 1.25,
+        "skillEff": 2,
+        "skillEffRaw": 2,
+        "starEff": 1,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 235,
+        "defStat": 221,
+        "isKill": true,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 191
+      }
+    },
+    {
+      "index": 14,
+      "id": "eff-025",
+      "tags": [
+        "相性0.25"
+      ],
+      "note": "恶系打在 恶+光 双抵抗",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "彼岸之手",
+        "defenderId": "窃光蚊",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 6,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 177,
+        "skillDmg": 66,
+        "starDmg": 111,
+        "defHP": 379,
+        "starPower": 156,
+        "stab": 1.25,
+        "skillEff": 0.25,
+        "skillEffRaw": 0.25,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 171,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 15,
+      "id": "eff-05",
+      "tags": [
+        "相性0.5"
+      ],
+      "note": "幻系被 机械+虫 抵抗",
+      "origin": "static",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "大爆炸",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 8,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 53,
+        "skillDmg": 53,
+        "starDmg": 0,
+        "defHP": 469,
+        "starPower": 232,
+        "stab": 1.25,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 280,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 16,
+      "id": "eff-1",
+      "tags": [
+        "相性1"
+      ],
+      "note": "幻系对 火+草 中性",
+      "origin": "static",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "大爆炸",
+        "defenderId": "燃薪虫",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 6,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 174,
+        "skillDmg": 174,
+        "starDmg": 0,
+        "defHP": 451,
+        "starPower": 156,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 173,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 17,
+      "id": "eff-2",
+      "tags": [
+        "相性2",
+        "无STAB"
+      ],
+      "note": "火系打 机械 单克制（恶系精灵无火 STAB）",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "火云车",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 3,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 401,
+        "skillDmg": 364,
+        "starDmg": 37,
+        "defHP": 445,
+        "starPower": 57,
+        "stab": 1,
+        "skillEff": 2,
+        "skillEffRaw": 2,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 18,
+      "id": "eff-3",
+      "tags": [
+        "相性3",
+        "STAB",
+        "档③"
+      ],
+      "note": "火系双克制 机械+虫",
+      "origin": "static",
+      "req": {
+        "attackerId": "音速犬",
+        "skillId": "火云车",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp"
+        ],
+        "starLayer": 1,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 741,
+        "skillDmg": 741,
+        "starDmg": 0,
+        "defHP": 469,
+        "starPower": 1,
+        "stab": 1.25,
+        "skillEff": 3,
+        "skillEffRaw": 3,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 255,
+        "defStat": 163,
+        "isKill": true,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 272
+      }
+    },
+    {
+      "index": 19,
+      "id": "combo-2",
+      "tags": [
+        "连击2"
+      ],
+      "note": "普通 2 连击",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "连续爪击",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp"
+        ],
+        "starLayer": 5,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 142,
+        "skillDmg": 47,
+        "starDmg": 95,
+        "defHP": 445,
+        "starPower": 121,
+        "stab": 1,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 2,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 154,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 20,
+      "id": "combo-3",
+      "tags": [
+        "连击3",
+        "STAB"
+      ],
+      "note": "幽系 3 连击，幻系精灵无幽 STAB？——落陨星兔有幽系",
+      "origin": "static",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "灵光",
+        "defenderId": "爆焰喷喷",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 4,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 240,
+        "skillDmg": 124,
+        "starDmg": 116,
+        "defHP": 411,
+        "starPower": 88,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 3,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 182,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 21,
+      "id": "combo-mod-multi",
+      "tags": [
+        "连击",
+        "特性mod"
+      ],
+      "note": "多维击打：敌方每 1 层星陨连击 +1（1+6=7）",
+      "origin": "static",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "多维击打",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 6,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 58,
+        "skillDmg": 58,
+        "starDmg": 0,
+        "defHP": 445,
+        "starPower": 156,
+        "stab": 1.25,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 7,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 272,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 22,
+      "id": "combo-fire-3",
+      "tags": [
+        "连击3",
+        "相性2"
+      ],
+      "note": "火系 3 连击对 火+草",
+      "origin": "static",
+      "req": {
+        "attackerId": "粉耳星兔",
+        "skillId": "流火",
+        "defenderId": "燃薪虫",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 3,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 227,
+        "skillDmg": 139,
+        "starDmg": 88,
+        "defHP": 451,
+        "starPower": 57,
+        "stab": 1,
+        "skillEff": 2,
+        "skillEffRaw": 2,
+        "starEff": 1,
+        "combo": 3,
+        "isMagic": true,
+        "atkStat": 297,
+        "defStat": 173,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 23,
+      "id": "ability-zhuixing-on",
+      "tags": [
+        "特性mod",
+        "坠星"
+      ],
+      "note": "祭礼巨像特性坠星：威力 ×(1+0.2n)",
+      "origin": "static",
+      "req": {
+        "attackerId": "祭礼巨像",
+        "skillId": "抛石",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 3,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 325,
+        "skillDmg": 295,
+        "starDmg": 30,
+        "defHP": 543,
+        "starPower": 57,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 229,
+        "defStat": 196,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 24,
+      "id": "ability-zhuixing-off",
+      "tags": [
+        "特性mod",
+        "0层"
+      ],
+      "note": "同组合 0 层对照（特性不触发）",
+      "origin": "static",
+      "req": {
+        "attackerId": "祭礼巨像",
+        "skillId": "抛石",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 0,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 184,
+        "skillDmg": 184,
+        "starDmg": 0,
+        "defHP": 543,
+        "starPower": -24,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 229,
+        "defStat": 196,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 25,
+      "id": "ability-heti-matk",
+      "tags": [
+        "特性mod",
+        "和弦共振"
+      ],
+      "note": "离心舞者特性：场上印记存在时魔攻 +50%",
+      "origin": "static",
+      "req": {
+        "attackerId": "离心舞者",
+        "skillId": "大爆炸",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 3,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 76,
+        "skillDmg": 76,
+        "starDmg": 0,
+        "defHP": 514,
+        "starPower": 57,
+        "stab": 1.25,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 371,
+        "defStat": 272,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 26,
+      "id": "ability-tianti",
+      "tags": [
+        "特性mod",
+        "技能mod",
+        "powerAdd"
+      ],
+      "note": "天体吸积：威力 +20n；叠加坠星 powerMult",
+      "origin": "static",
+      "req": {
+        "attackerId": "祭礼巨像",
+        "skillId": "天体吸积",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 7,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 253,
+        "skillDmg": 253,
+        "starDmg": 0,
+        "defHP": 469,
+        "starPower": 193,
+        "stab": 1.25,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 229,
+        "defStat": 196,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 27,
+      "id": "state-dark-raid",
+      "tags": [
+        "应对状态",
+        "powerMult2"
+      ],
+      "note": "暗突袭 + 聚能：威力 ×2",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "暗突袭",
+        "defenderId": "贝古斯",
+        "defenseSkillId": "__state__",
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 3,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 265,
+        "skillDmg": 228,
+        "starDmg": 37,
+        "defHP": 514,
+        "starPower": 57,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 28,
+      "id": "state-combo-double",
+      "tags": [
+        "应对状态",
+        "连击翻倍"
+      ],
+      "note": "连续爪击 + 聚能：连击 ×2",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "连续爪击",
+        "defenderId": "贝古斯",
+        "defenseSkillId": "__state__",
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 3,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 115,
+        "skillDmg": 78,
+        "starDmg": 37,
+        "defHP": 514,
+        "starPower": 57,
+        "stab": 1,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 4,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 29,
+      "id": "state-yuanli-25",
+      "tags": [
+        "应对状态",
+        "powerMult2.5"
+      ],
+      "note": "愿力冲击 + 聚能：威力 ×2.5",
+      "origin": "static",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "__yuanli_幽__",
+        "defenderId": "爆焰喷喷",
+        "defenseSkillId": "__state__",
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 4,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 446,
+        "skillDmg": 330,
+        "starDmg": 116,
+        "defHP": 411,
+        "starPower": 88,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 182,
+        "isKill": true,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 35
+      }
+    },
+    {
+      "index": 30,
+      "id": "state-chongji-ignore",
+      "tags": [
+        "应对状态",
+        "ignoreResist"
+      ],
+      "note": "虫击 + 聚能：威力 ×2 且把 0.25 抗性中和为 1",
+      "origin": "static",
+      "req": {
+        "attackerId": "丢丢（草地附近的样子）",
+        "skillId": "虫击",
+        "defenderId": "贝古斯",
+        "defenseSkillId": "__state__",
+        "attackerNature": {
+          "up": "spd",
+          "down": "def"
+        },
+        "attackerIVs": [
+          "spd",
+          "atk",
+          "matk"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 2,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 133,
+        "skillDmg": 124,
+        "starDmg": 9,
+        "defHP": 514,
+        "starPower": 28,
+        "stab": 1,
+        "skillEff": 1,
+        "skillEffRaw": 0.25,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 143,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 31,
+      "id": "defskill-03",
+      "tags": [
+        "防御技能"
+      ],
+      "note": "贝古斯 防御（reduction 0.3）",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "彼岸之手",
+        "defenderId": "贝古斯",
+        "defenseSkillId": "防御",
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 5,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 96,
+        "skillDmg": 73,
+        "starDmg": 23,
+        "defHP": 514,
+        "starPower": 121,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 32,
+      "id": "defskill-05",
+      "tags": [
+        "防御技能"
+      ],
+      "note": "贝古斯 有效预防（reduction 0.5）",
+      "origin": "static",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "大爆炸",
+        "defenderId": "贝古斯",
+        "defenseSkillId": "有效预防",
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 7,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 27,
+        "skillDmg": 27,
+        "starDmg": 0,
+        "defHP": 445,
+        "starPower": 193,
+        "stab": 1.25,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 272,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 33,
+      "id": "chip-combo",
+      "tags": [
+        "chip",
+        "连击"
+      ],
+      "note": "连击 chip +1 叠加到 2 连击技能",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "连续爪击",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 3,
+        "attackerCombo": 1,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 95,
+        "skillDmg": 58,
+        "starDmg": 37,
+        "defHP": 445,
+        "starPower": 57,
+        "stab": 1,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 3,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 34,
+      "id": "chip-power",
+      "tags": [
+        "chip",
+        "威力"
+      ],
+      "note": "威力 chip +30 加在基础威力上",
+      "origin": "static",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "彼岸之手",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 3,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 30
+      },
+      "expected": {
+        "finalDamage": 330,
+        "skillDmg": 293,
+        "starDmg": 37,
+        "defHP": 445,
+        "starPower": 57,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 35,
+      "id": "scan-medium-kill",
+      "tags": [
+        "需多层",
+        "minKill=13",
+        "scan-medium"
+      ],
+      "note": "中坚物攻打档①",
+      "origin": "scan",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "彼岸之手",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 13,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 541,
+        "skillDmg": 244,
+        "starDmg": 297,
+        "defHP": 514,
+        "starPower": 457,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": true,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 27
+      }
+    },
+    {
+      "index": 36,
+      "id": "scan-medium-below",
+      "tags": [
+        "临界未斩",
+        "minKill=13",
+        "scan-medium"
+      ],
+      "note": "中坚物攻打档①（比 minKill 少 1 层）",
+      "origin": "scan",
+      "req": {
+        "attackerId": "龙息帕尔",
+        "skillId": "彼岸之手",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 12,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 509,
+        "skillDmg": 244,
+        "starDmg": 265,
+        "defHP": 514,
+        "starPower": 408,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 270,
+        "defStat": 187,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 37,
+      "id": "scan-fast-zero",
+      "tags": [
+        "0层即斩",
+        "scan-fast"
+      ],
+      "note": "双克制物攻，可能 0 层即斩",
+      "origin": "scan",
+      "req": {
+        "attackerId": "音速犬",
+        "skillId": "火云车",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 0,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 616,
+        "skillDmg": 616,
+        "starDmg": 0,
+        "defHP": 543,
+        "starPower": -24,
+        "stab": 1.25,
+        "skillEff": 3,
+        "skillEffRaw": 3,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 255,
+        "defStat": 196,
+        "isKill": true,
+        "starTriggered": false,
+        "isSkillIllusion": false,
+        "overflow": 73
+      }
+    },
+    {
+      "index": 38,
+      "id": "scan-weak-magic-kill",
+      "tags": [
+        "需多层",
+        "minKill=22",
+        "scan-weak-magic"
+      ],
+      "note": "低魔攻打高特防，预期不可斩",
+      "origin": "scan",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "升龙咆哮",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 22,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 525,
+        "skillDmg": 88,
+        "starDmg": 437,
+        "defHP": 514,
+        "starPower": 988,
+        "stab": 1,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 272,
+        "isKill": true,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 11
+      }
+    },
+    {
+      "index": 39,
+      "id": "scan-weak-magic-below",
+      "tags": [
+        "临界未斩",
+        "minKill=22",
+        "scan-weak-magic"
+      ],
+      "note": "低魔攻打高特防，预期不可斩（比 minKill 少 1 层）",
+      "origin": "scan",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "升龙咆哮",
+        "defenderId": "贝古斯",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 21,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 495,
+        "skillDmg": 88,
+        "starDmg": 407,
+        "defHP": 514,
+        "starPower": 921,
+        "stab": 1,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 272,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 40,
+      "id": "scan-bulky-kill",
+      "tags": [
+        "需多层",
+        "minKill=11",
+        "scan-bulky"
+      ],
+      "note": "高 HP 火系靶子",
+      "origin": "scan",
+      "req": {
+        "attackerId": "粉耳星兔",
+        "skillId": "音爆",
+        "defenderId": "火焰猿",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 11,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 612,
+        "skillDmg": 162,
+        "starDmg": 450,
+        "defHP": 586,
+        "starPower": 361,
+        "stab": 1,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 297,
+        "defStat": 215,
+        "isKill": true,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 26
+      }
+    },
+    {
+      "index": 41,
+      "id": "scan-bulky-below",
+      "tags": [
+        "临界未斩",
+        "minKill=11",
+        "scan-bulky"
+      ],
+      "note": "高 HP 火系靶子（比 minKill 少 1 层）",
+      "origin": "scan",
+      "req": {
+        "attackerId": "粉耳星兔",
+        "skillId": "音爆",
+        "defenderId": "火焰猿",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 10,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 555,
+        "skillDmg": 162,
+        "starDmg": 393,
+        "defHP": 586,
+        "starPower": 316,
+        "stab": 1,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 1,
+        "isMagic": true,
+        "atkStat": 297,
+        "defStat": 215,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 42,
+      "id": "scan-low-tier-kill",
+      "tags": [
+        "需多层",
+        "minKill=5",
+        "scan-low-tier"
+      ],
+      "note": "档③低血量靶子",
+      "origin": "scan",
+      "req": {
+        "attackerId": "祭礼巨像",
+        "skillId": "抛石",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp"
+        ],
+        "starLayer": 5,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 519,
+        "skillDmg": 443,
+        "starDmg": 76,
+        "defHP": 469,
+        "starPower": 121,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 229,
+        "defStat": 163,
+        "isKill": true,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 50
+      }
+    },
+    {
+      "index": 43,
+      "id": "scan-low-tier-below",
+      "tags": [
+        "临界未斩",
+        "minKill=5",
+        "scan-low-tier"
+      ],
+      "note": "档③低血量靶子（比 minKill 少 1 层）",
+      "origin": "scan",
+      "req": {
+        "attackerId": "祭礼巨像",
+        "skillId": "抛石",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "spd",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp"
+        ],
+        "starLayer": 4,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 454,
+        "skillDmg": 399,
+        "starDmg": 55,
+        "defHP": 469,
+        "starPower": 88,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 229,
+        "defStat": 163,
+        "isKill": false,
+        "starTriggered": true,
+        "isSkillIllusion": false,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 44,
+      "id": "scan-combo-mod-kill",
+      "tags": [
+        "需多层",
+        "minKill=20",
+        "scan-combo-mod"
+      ],
+      "note": "多维击打高连击成长",
+      "origin": "scan",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "多维击打",
+        "defenderId": "泥吼牙",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 20,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 499,
+        "skillDmg": 499,
+        "starDmg": 0,
+        "defHP": 498,
+        "starPower": 856,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 21,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 190,
+        "isKill": true,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 1
+      }
+    },
+    {
+      "index": 45,
+      "id": "scan-combo-mod-below",
+      "tags": [
+        "临界未斩",
+        "minKill=20",
+        "scan-combo-mod"
+      ],
+      "note": "多维击打高连击成长（比 minKill 少 1 层）",
+      "origin": "scan",
+      "req": {
+        "attackerId": "落陨星兔",
+        "skillId": "多维击打",
+        "defenderId": "泥吼牙",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 19,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 475,
+        "skillDmg": 475,
+        "starDmg": 0,
+        "defHP": 498,
+        "starPower": 793,
+        "stab": 1.25,
+        "skillEff": 1,
+        "skillEffRaw": 1,
+        "starEff": 1,
+        "combo": 20,
+        "isMagic": true,
+        "atkStat": 267,
+        "defStat": 190,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 46,
+      "id": "scan-unkillable-phantom-unkillable",
+      "tags": [
+        "不可斩",
+        "scan-unkillable-phantom"
+      ],
+      "note": "离心舞者念力膨胀（幻系，无星陨伤害）打飞飞钥档①（99 层仍不够）",
+      "origin": "scan",
+      "req": {
+        "attackerId": "离心舞者",
+        "skillId": "念力膨胀",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "atk",
+          "down": "matk"
+        },
+        "attackerIVs": [
+          "atk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 99,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 38,
+        "skillDmg": 38,
+        "starDmg": 0,
+        "defHP": 543,
+        "starPower": 12153,
+        "stab": 1.25,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 1,
+        "isMagic": false,
+        "atkStat": 168,
+        "defStat": 196,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    },
+    {
+      "index": 47,
+      "id": "scan-unkillable-extreme-unkillable",
+      "tags": [
+        "不可斩",
+        "scan-unkillable-extreme"
+      ],
+      "note": "空空颅多维击打（幻系魔攻 p15）对最高血量档①，极端不可斩（99 层仍不够）",
+      "origin": "scan",
+      "req": {
+        "attackerId": "空空颅",
+        "skillId": "多维击打",
+        "defenderId": "飞飞钥",
+        "defenseSkillId": null,
+        "attackerNature": {
+          "up": "matk",
+          "down": "atk"
+        },
+        "attackerIVs": [
+          "matk",
+          "hp",
+          "spd"
+        ],
+        "defenderNature": {
+          "up": "hp",
+          "down": "atk"
+        },
+        "defenderIVs": [
+          "hp",
+          "def",
+          "mdef"
+        ],
+        "starLayer": 99,
+        "attackerCombo": 0,
+        "attackerPowerBoost": 0
+      },
+      "expected": {
+        "finalDamage": 365,
+        "skillDmg": 365,
+        "starDmg": 0,
+        "defHP": 543,
+        "starPower": 12153,
+        "stab": 1,
+        "skillEff": 0.5,
+        "skillEffRaw": 0.5,
+        "starEff": 0.5,
+        "combo": 100,
+        "isMagic": true,
+        "atkStat": 151,
+        "defStat": 280,
+        "isKill": false,
+        "starTriggered": false,
+        "isSkillIllusion": true,
+        "overflow": 0
+      }
+    }
+  ]
+}

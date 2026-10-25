@@ -1,0 +1,26 @@
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+release/
+
+# 中间产物（上游仓库快照、截图、诊断日志、对拍临时文件）
+_intermediates/
+work/
+
+# 测试依赖与产物
+tests/node_modules/
+tests/package-lock.json
+
+# 本地状态与日志
+*.log
+debug.log*
+state.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器
+.vscode/
+.idea/

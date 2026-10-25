@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>星陨斩杀线</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="passthrough">
+  <div id="frame">
+
+    <!-- ① 标题栏（整条可拖动；按钮 no-drag） -->
+    <header id="titlebar">
+      <div class="brand">
+        <span class="brand-star">★</span>
+        <span class="brand-name">星陨斩杀线</span>
+        <span id="dataTag" class="data-tag" title="数据来源">内置数据</span>
+      </div>
+
+      <!-- 小条模式：攻方摘要 + 靶子按钮 + 内联搜索（展开时隐藏） -->
+      <div id="minibar" class="minibar" aria-hidden="true">
+        <span id="miniSum" class="mini-sum"></span>
+        <span class="mini-sep"></span>
+        <button id="miniTarget" class="mini-target" title="更换防御靶子"></button>
+        <input id="miniSearch" class="mini-search" type="text" placeholder="搜守方…"
+               autocomplete="off" spellcheck="false" />
+      </div>
+
+      <div class="win-btns">
+          <button id="btnTip" class="wbtn wbtn-tip" title="使用提示">ⓘ</button>
+        <button id="btnPass" class="wbtn" title="点击穿透开关（Ctrl+Alt+T）">穿透</button>
+        <button id="btnCollapse" class="wbtn" title="收成小条（Ctrl+Shift+M）">收起</button>
+        <button id="btnClose" class="wbtn wbtn-danger" title="关闭浮窗">✕</button>
+      </div>
+    </header>
+
+    <!-- 小条里的轻量守方菜单（点靶子按钮/聚焦搜索框时，在窗口临时撑开的那块区域里显示） -->
+    <div id="miniMenu" class="mini-menu is-hidden" aria-hidden="true">
+      <div class="mm-head">
+        <button id="mmBack" class="mm-back is-hidden" title="返回属性列表">‹ 返回</button>
+        <span id="mmTitle" class="mm-title">选择守方</span>
+        <button id="mmClose" class="mm-close" title="关闭">✕</button>
+      </div>
+      <div id="mmBody" class="mm-body"></div>
+    </div>
+
+    <!-- ② 主内容 -->
+    <main id="content">
+
+            <div id="tip" class="tip is-hidden">
+        <span class="tip-icon">!</span>
+        <span class="tip-text">游戏请设为「无边框窗口全屏」，独占全屏可能压不住浮窗。</span>
+        <button id="tipClose" class="tip-close" title="知道了">✕</button>
+      </div>
+
+      <section class="card slot-card" data-slot="atk1">
+        <div class="slot-line">
+          <span class="slot-tag atk">攻①</span>
+          <button class="picker-btn" data-slot="atk1" title="点击选择精灵（可用拼音/首字母/图鉴号搜索）"></button>
+        </div>
+        <div class="slot-line slot-selects">
+          <select class="select skill-select" data-slot="atk1" title="技能"></select>
+          <select class="select cfg-nature" data-slot="atk1" title="性格"></select>
+          <select class="select cfg-ivs" data-slot="atk1" title="加点"></select>
+        </div>
+        <div class="mods" data-slot="atk1">
+          <div class="mod-item">
+            <span class="mod-label">攻击加成</span>
+            <button class="mod-btn" data-slot="atk1" data-mod="atkPct" data-dir="-1" title="-50%">−</button>
+            <input class="mod-input" type="number" step="50" min="-100" max="300" value="0" data-slot="atk1" data-mod="atkPct" title="可直接输入任意整数（-100 ~ 300）">
+            <span class="mod-unit">%</span>
+            <button class="mod-btn" data-slot="atk1" data-mod="atkPct" data-dir="1" title="+50%">+</button>
+          </div>
+          <div class="mod-item">
+            <span class="mod-label">威力加成</span>
+            <button class="mod-btn" data-slot="atk1" data-mod="powerPct" data-dir="-1" title="-50%">−</button>
+            <input class="mod-input" type="number" step="50" min="-100" max="300" value="0" data-slot="atk1" data-mod="powerPct" title="可直接输入任意整数（-100 ~ 300）">
+            <span class="mod-unit">%</span>
+            <button class="mod-btn" data-slot="atk1" data-mod="powerPct" data-dir="1" title="+50%">+</button>
+          </div>
+          <span class="cfg-hint" data-slot="atk1"></span>
+        </div>
+      </section>
+
+      <section class="card slot-card" data-slot="atk2">
+        <div class="slot-line">
+          <span class="slot-tag atk">攻②</span>
+          <button class="picker-btn" data-slot="atk2" title="点击选择精灵（可用拼音/首字母/图鉴号搜索）"></button>
+        </div>
+        <div class="slot-line slot-selects">
+          <select class="select skill-select" data-slot="atk2" title="技能"></select>
+          <select class="select cfg-nature" data-slot="atk2" title="性格"></select>
+          <select class="select cfg-ivs" data-slot="atk2" title="加点"></select>
+        </div>
+        <div class="mods" data-slot="atk2">
+          <div class="mod-item">
+            <span class="mod-label">攻击加成</span>
+            <button class="mod-btn" data-slot="atk2" data-mod="atkPct" data-dir="-1" title="-50%">−</button>
+            <input class="mod-input" type="number" step="50" min="-100" max="300" value="0" data-slot="atk2" data-mod="atkPct" title="可直接输入任意整数（-100 ~ 300）">
+            <span class="mod-unit">%</span>
+            <button class="mod-btn" data-slot="atk2" data-mod="atkPct" data-dir="1" title="+50%">+</button>
+          </div>
+          <div class="mod-item">
+            <span class="mod-label">威力加成</span>
+            <button class="mod-btn" data-slot="atk2" data-mod="powerPct" data-dir="-1" title="-50%">−</button>
+            <input class="mod-input" type="number" step="50" min="-100" max="300" value="0" data-slot="atk2" data-mod="powerPct" title="可直接输入任意整数（-100 ~ 300）">
+            <span class="mod-unit">%</span>
+            <button class="mod-btn" data-slot="atk2" data-mod="powerPct" data-dir="1" title="+50%">+</button>
+          </div>
+          <span class="cfg-hint" data-slot="atk2"></span>
+        </div>
+      </section>
+
+      <!-- 防御靶子：单行 -->
+      <section class="card slot-card slot-card-def" data-slot="def">
+        <div class="slot-line">
+          <span class="slot-tag def">靶子</span>
+          <button class="picker-btn" data-slot="def" title="点击选择防御目标"></button>
+          <select class="select skill-select def-skill" data-slot="def" title="防御技"></select>
+        </div>
+      </section>
+
+      <!-- ③ 结果：2 攻方 × 3 档 -->
+      <section class="grid-wrap">
+        <div class="grid-head">
+          <span class="grid-corner"></span>
+          <button class="tier-head" data-tier="t1" title="性格 生命↑物攻↓ · 加点 生命/物防/魔防">
+            <b>档①</b><i>纯肉</i>
+          </button>
+          <button class="tier-head" data-tier="t2" title="性格 速度↑物攻↓（防御三维无加成）· 加点 生命/物防/魔防">
+            <b>档②</b><i>防血能力值</i>
+          </button>
+          <button class="tier-head" data-tier="t3" title="性格 速度↑物攻↓ · 加点 仅生命">
+            <b>档③</b><i>仅血量能力值</i>
+          </button>
+        </div>
+        <div class="grid-row" data-row="atk1">
+          <div class="row-head"><b>攻① <span class="row-name"></span></b><i class="row-cfg"></i></div>
+        </div>
+        <div class="grid-row" data-row="atk2">
+          <div class="row-head"><b>攻② <span class="row-name"></span></b><i class="row-cfg"></i></div>
+        </div>
+        <div class="grid-note" id="gridNote"></div>
+      </section>
+    </main>
+
+    <!-- ④ 20 组明细面板（点格子滑出） -->
+    <section id="detail" class="detail is-hidden" aria-hidden="true">
+      <div class="detail-head">
+        <span class="detail-title" id="detailTitle">明细</span>
+        <div class="detail-tools">
+          <button class="tab is-on" data-view="groups">分组清单</button>
+          <button class="tab" data-view="matrix">矩阵</button>
+          <button class="wbtn" id="detailClose" title="关闭明细">✕</button>
+        </div>
+      </div>
+      <div class="detail-sum" id="detailSum"></div>
+      <div class="filter-row" id="filterRow">
+        <button class="chip" data-filter="atkNature">只看攻击型性格</button>
+        <button class="chip" data-filter="killable">只看可斩杀</button>
+        <button class="chip" data-filter="atkIvs">加点含攻击</button>
+      </div>
+      <div class="detail-body" id="detailBody"></div>
+      <div class="detail-foot" id="detailFoot"></div>
+    </section>
+
+    <!-- ⑤ 精灵选择器浮层（先按属性筛选，再点选；也支持名字/拼音/首字母/图鉴号） -->
+    <div id="picker" class="picker-layer is-hidden" aria-hidden="true">
+      <div class="picker-panel">
+        <div class="picker-head">
+          <span id="pickerTitle">选择精灵</span>
+          <button class="wbtn" id="pickerClose">✕</button>
+        </div>
+        <input id="pickerSearch" class="picker-search" type="text" autocomplete="off" spellcheck="false"
+               placeholder="输入名字 / 拼音 / 首字母 / 图鉴号（如 lxpe）" />
+        <div id="pickerTypes" class="picker-types"></div>
+        <div id="pickerList" class="picker-list"></div>
+        <div class="picker-foot"><span id="pickerCount">-</span><span>↑↓ 选择 · Enter 确认 · Esc 关闭</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="../data/roco-data.js"></script>
+  <script src="../core/calc-core.js"></script>
+  <script src="../core/domain.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

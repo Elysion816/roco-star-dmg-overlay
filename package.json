@@ -1,0 +1,28 @@
+{
+  "name": "xingyun-killline",
+  "productName": "星陨斩杀线",
+  "version": "1.0.0",
+  "description": "《洛克王国：世界》星陨玩法斩杀线置顶浮窗（Electron 绿色版）",
+  "main": "src/main/main.js",
+  "private": true,
+  "author": "星陨斩杀线",
+  "license": "MIT",
+  "scripts": {
+    "start": "node tools/start.mjs",
+    "extract": "node tools/extract-core.mjs",
+    "build:data": "node tools/build-data.mjs",
+    "verify": "node tools/verify-core.mjs",
+    "make:icon": "node tools/make-icon.mjs",
+    "pack": "node tools/pack.mjs",
+    "rebuild": "node tools/extract-core.mjs && node tools/build-data.mjs && node tools/verify-core.mjs",
+    "diag": "node tools/diag.mjs"
+  },
+  "devDependencies": {
+    "electron": "35.7.5",
+    "@electron/packager": "^18.3.6"
+  },
+  "build": {
+    "appId": "local.xingyun.killline",
+    "productName": "星陨斩杀线"
+  }
+}
