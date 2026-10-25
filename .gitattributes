@@ -1,0 +1,10 @@
+# 统一换行符：文本用 LF，批处理用 CRLF，二进制不处理
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.ico binary
+*.exe binary
+*.zip binary
