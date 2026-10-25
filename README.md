@@ -1,5 +1,9 @@
 # 星陨斩杀线 · 桌面置顶浮窗
 
+[![Release](https://img.shields.io/github/v/release/Elysion816/roco-star-dmg-overlay?label=release)](https://github.com/Elysion816/roco-star-dmg-overlay/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Elysion816/roco-star-dmg-overlay/total)](https://github.com/Elysion816/roco-star-dmg-overlay/releases)
+[![License](https://img.shields.io/github/license/Elysion816/roco-star-dmg-overlay)](LICENSE)
+
 > **本项目基于 [Bartzh/roco-star-dmg](https://github.com/Bartzh/roco-star-dmg) 开发。**
 > 
 > 数值内核（伤害公式、属性结算、特性表）由该项目的 `calculator.js` 按行段逐字抽取生成，
@@ -19,17 +23,34 @@
 ## 1. 这是什么
 
 - 一个 **Windows 桌面浮窗**（Electron，绿色免安装），常驻置顶，压在「无边框窗口全屏」的游戏画面上。
-- 默认 **点击穿透**：鼠标可以直接点下面的游戏，浮窗只看不挡。需要操作浮窗时按 `Alt+X` 接管鼠标。
+  **[→ 去 Releases 下载 zip](https://github.com/Elysion816/roco-star-dmg-overlay/releases/latest)**，解压后双击 `星陨斩杀线.exe` 即可运行。
+- 启动默认 **接管鼠标**（可以直接点浮窗操作）；按 `Alt+X` 把鼠标交还给游戏（点击穿透），再按一次收回。
 - 三档靶子固定（纯肉 / 防血能力值 / 仅血量能力值），不用每次自己调性格与加点，直接横向对比两只攻方的斩杀线。
 - 数据每次启动自动从 stardmg.top 拉取最新图鉴，失败自动用内置离线包。
 
 ---
 
-## 2. 启动方式
+## 2. 下载与启动
 
-### 方式 A：开发/本机运行（已装依赖）
+### 方式 A：下载现成版本（推荐 · 免安装）
+
+打开 **[Releases](https://github.com/Elysion816/roco-star-dmg-overlay/releases/latest)**，下载最新的 zip：
+
+```
+roco-star-dmg-overlay-v1.0.0-win32-x64.zip     （约 119 MB）
+```
+
+解压后双击里面的 **`星陨斩杀线.exe`** 即可运行。
+
+- 免安装、免 Node，解压到任意位置或拷到别的机器都能直接用（Windows x64）
+- 解压后约 286MB，主要体积是 Electron 运行时本身（Chromium + Node）
+- 未做代码签名，首次运行 Windows SmartScreen 可能提示「未知发布者」→ 点「更多信息 → 仍要运行」
+
+### 方式 B：从源码运行
 
 ```bash
+git clone https://github.com/Elysion816/roco-star-dmg-overlay.git
+cd roco-star-dmg-overlay
 npm install     # 首次；只装 electron 35.7.5 与 @electron/packager（devDependencies）
 npm start       # 已内置 tools/start.mjs：会先清掉 ELECTRON_RUN_AS_NODE 再拉起 Electron
 ```
@@ -37,16 +58,7 @@ npm start       # 已内置 tools/start.mjs：会先清掉 ELECTRON_RUN_AS_NODE 
 > `npm start` 走的是 `tools/start.mjs`。某些 IDE / 终端 / 沙箱会带上 `ELECTRON_RUN_AS_NODE=1`，
 > 那会让 electron 以「纯 Node」模式运行（窗口起不来），这个脚本会先把该变量摘掉。
 
-### 方式 B：直接用打好的绿色版（免安装）
-
-双击：
-
-```
-dist/星陨斩杀线-win32-x64/星陨斩杀线.exe
-```
-
-整个文件夹可以拷到任意位置/别的机器（Windows x64），不需要安装程序，也不需要 Node。
-文件夹约 286MB，主要体积是 Electron 运行时本身（Chromium + Node）。
+> 想自己产出绿色版：`npm run pack` → `dist/星陨斩杀线-win32-x64/`（详见 [11. 打包](#11-打包)）。
 
 ---
 
@@ -69,8 +81,8 @@ dist/星陨斩杀线-win32-x64/星陨斩杀线.exe
 | `Esc` | 依次关闭明细面板 → 精灵选择器；都关着时「交还鼠标，回到穿透」 |
 | 托盘图标 | 左键＝呼出/接管；右键＝显示/隐藏、穿透、小条、重新拉取数据、打开数据目录、退出 |
 
-默认处于 **点击穿透**，所以浮窗不会影响游戏操作。想看明细时按 `Alt+X` 或 `Ctrl+Alt+T`，
-操作完按 `Esc` 交还鼠标。
+启动后默认 **接管鼠标**（可以直接点浮窗）。不想挡游戏操作时按 `Alt+X` 或 `Ctrl+Alt+T` 交还鼠标（点击穿透），
+再按一次收回；操作完也可以按 `Esc` 交还。
 
 > 穿透状态下窗口不接收键盘和点击（Windows `setIgnoreMouseEvents` 的语义），
 > 只能用全局快捷键或托盘唤回。
