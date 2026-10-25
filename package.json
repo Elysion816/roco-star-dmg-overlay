@@ -4,8 +4,24 @@
   "version": "1.0.0",
   "description": "《洛克王国：世界》星陨玩法斩杀线置顶浮窗（Electron 绿色版）",
   "main": "src/main/main.js",
-  "private": true,
-  "author": "星陨斩杀线",
+  "private": false,
+  "author": "Elysion816",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Elysion816/roco-star-dmg-overlay.git"
+  },
+  "homepage": "https://github.com/Elysion816/roco-star-dmg-overlay#readme",
+  "bugs": {
+    "url": "https://github.com/Elysion816/roco-star-dmg-overlay/issues"
+  },
+  "keywords": [
+    "洛克王国",
+    "星陨",
+    "斩杀线",
+    "伤害计算器",
+    "electron",
+    "overlay"
+  ],
   "license": "MIT",
   "scripts": {
     "start": "node tools/start.mjs",
