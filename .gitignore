@@ -26,3 +26,7 @@ Thumbs.db
 .idea/
 # 打包产物（走 GitHub Releases，不入库）
 *.zip
+/nul
+/星陨斩杀线-介绍片-封面.png
+/星陨斩杀线-介绍片.mp4
+/星陨斩杀线-介绍片.srt
