@@ -9,7 +9,7 @@
  *                   这些东西组织好，并提供带缓存的高性能批量求解
  *   - app.js      ：只负责把结果画出来
  *
- * 性能：主路径 2 攻方 × 3 档 × 1 套当前配置 = 6 次求解；明细参考 20 组按需计算，每次约 1 + log2(层上限) 次伤害计算。
+ * 性能：主路径 3 攻方 × 3 档 × 1 套当前配置 = 9 次求解；明细参考 20 组按需计算，每次约 1 + log2(层上限) 次伤害计算。
  *      全部走 TypedArray + 字符串 key 缓存，实测见 tools/verify-core.mjs 的输出。
  *
  * 环境：浏览器（<script>，依赖 window.RocoCore）与 Node（require）双通道。
@@ -185,7 +185,9 @@
   ];
 
   // ---------------------------------------------------------------------------
-  // calc-core 需要的固定上下文片段（浮窗不开放属性 buff / 威力 / 连击修正）
+  // calc-core 需要的固定上下文片段。
+  // 浮窗已开放两项加成的输入：「攻击加成」进 attackerBuff（百分比），
+  // 「威力加成」进 attackerPowerBoost（威力点数）；只有「连击修正」（attackerCombo）仍固定为 0。
   // ---------------------------------------------------------------------------
   const ATK_BUFF = Object.freeze({ atk: 0, matk: 0 });
   const DEF_BUFF = Object.freeze({ def: 0, mdef: 0 });
@@ -302,17 +304,24 @@
   // ---------------------------------------------------------------------------
   // 场景（一次求解的全部输入）
   // ---------------------------------------------------------------------------
-  /**
-   * @param {{attackerId:string, attackSkillId?:string|null, defenderId:string,
-   *          defenseSkillId?:string|null, tierKey?:string}} cfg
-   * @returns {null|object} 缺少精灵/技能时返回 null
-   */
-  const MOD_MIN = -100;
-  const MOD_MAX = 300;
-  const clampMod = v => {
+  /** 攻击加成：百分比 buff，单位 %；± 按钮步进 50% */
+  const ATK_PCT_MIN = -100;
+  const ATK_PCT_MAX = 300;
+  /** 威力加成：**数值**加成（直接加到技能威力上），单位「威力」，不是百分比 */
+  const POWER_ADD_MIN = -100;
+  const POWER_ADD_MAX = 300;
+  /** 界面上 +/- 按钮的步进 */
+  const ATK_PCT_STEP = 50;
+  const POWER_ADD_STEP = 20;
+
+  const clampInt = (v, lo, hi) => {
     const n = Math.round(Number(v) || 0);
-    return Math.min(MOD_MAX, Math.max(MOD_MIN, n));
+    return Math.min(hi, Math.max(lo, n));
   };
+  const clampAtkPct = v => clampInt(v, ATK_PCT_MIN, ATK_PCT_MAX);
+  const clampPowerAdd = v => clampInt(v, POWER_ADD_MIN, POWER_ADD_MAX);
+  /** 通用夹紧（旧名保留：默认按攻击加成范围；威力加成请用 clampPowerAdd） */
+  const clampMod = clampAtkPct;
 
   /** CONFIG_IVS 项的规范键（与 IVS_LIST 的键一致） */
   function ivsKeyOf(v) {
@@ -339,6 +348,16 @@
     return { nature: nat, ivsDef: ivs, natureKey: nat.key, ivsKey: ivs.key };
   }
 
+  /**
+   * 组装一次求解的全部输入。
+   * @param {{attackerId:string, attackSkillId?:string|null, defenderId:string,
+   *          defenseSkillId?:string|null, tierKey?:string,
+   *          natureKey?:string, ivsKey?:string,
+   *          atkPct?:number,   // 攻击加成：百分比，夹紧 [-100, 300]
+   *          powerAdd?:number  // 威力加成：**威力点数**，直接加到技能威力上，夹紧 [-100, 300]
+   *         }} cfg
+   * @returns {null|object} 缺少精灵/技能时返回 null
+   */
   function buildScene(cfg) {
     const attacker = getSprite(cfg.attackerId);
     const defender = getSprite(cfg.defenderId);
@@ -361,16 +380,16 @@
     const def = defaultConfigFor(attacker);
     const conf = resolveConfig(cfg.natureKey || def.natureKey, cfg.ivsKey || def.ivsKey);
     const scene = {
-      // 当前生效的性格 / 加点（6 格按这一套算，不再遍历全部组合挑最优）
+      // 当前生效的性格 / 加点（该行 3 格按这一套算，不再遍历全部组合挑最优）
       natureKey: conf.natureKey,
       ivsKey: conf.ivsKey,
       nature: conf.nature.nature,
       ivs: conf.ivsDef.ivs,
       natureLabel: conf.nature.label,
       ivsLabel: conf.ivsDef.label,
-      // 攻方加成（百分比）：攻击加成直接进 attackerBuff，威力加成换算成 flat powerBoost
-      atkPct: clampMod(cfg.atkPct),
-      powerPct: clampMod(cfg.powerPct),
+      // 攻方加成：攻击加成是百分比（进 attackerBuff），威力加成是**数值**（直接进 flat powerBoost）
+      atkPct: clampAtkPct(cfg.atkPct),
+      powerAdd: clampPowerAdd(cfg.powerAdd),
       attackerId: attacker.id,
       attacker: leanSprite(attacker),
       attackSkillId: attackSkill.id,
@@ -382,7 +401,7 @@
       tier,
     };
     scene.key = [scene.attackerId, scene.attackSkillId, scene.defenderId, scene.defenseSkillId, tier.key,
-      'a' + scene.atkPct, 'p' + scene.powerPct].join('|');
+      'a' + scene.atkPct, 'p' + scene.powerAdd].join('|');
     // 20 组批量结果与"当前配置"无关，单独用不含 config 的键
     scene.allKey = scene.key;
     scene.key += '|' + scene.natureKey + '|' + scene.ivsKey;
@@ -392,16 +411,21 @@
   // ---------------------------------------------------------------------------
   // 事务：求解
   // ---------------------------------------------------------------------------
-  /** 加成 → ctx 字段：攻击加成按百分比进 buff；威力加成按「威力×pct/100」换算成内核的 flat powerBoost */
+  /**
+   * 加成 → ctx 字段。
+   *   - 攻击加成（atkPct，%）：进 attackerBuff，内核按百分比放大攻方攻击/魔攻终值。
+   *   - 威力加成（powerAdd，**威力点数**）：直接进内核的 flat powerBoost，与技能基础威力相加；
+   *     内核最终是 power = max(0, (skill.power + powerBoost + dyn.powerAdd) * dyn.powerMult)，
+   *     所以负加成最多把威力压到 0，不会出现负威力。
+   */
   function modFields(scene) {
     const atkPct = scene.atkPct || 0;
-    const powerPct = scene.powerPct || 0;
-    const power = (scene.attackSkill && scene.attackSkill.power) || 0;
+    const powerAdd = scene.powerAdd || 0;
     return {
       attackerBuff: atkPct
         ? { atk: ATK_BUFF.atk + atkPct, matk: ATK_BUFF.matk + atkPct }
         : ATK_BUFF,
-      attackerPowerBoost: power > 0 && powerPct ? Math.round(power * powerPct / 100) : 0,
+      attackerPowerBoost: powerAdd,
     };
   }
 
@@ -735,7 +759,9 @@
     STAT_KEYS, STAT_LABELS, STAT_SHORT, DEFAULT_MAX_LAYER, HARD_MAX_LAYER, NO_KILL,
     NATURES, IVS_LIST, COMBOS, DEFENDER_TIERS, NO_DEFENSE_SKILL,
     CONFIG_NATURES, CONFIG_IVS, CONFIGS, getConfigs16, shortNatureLabel, fullNatureLabel,
-    MOD_MIN, MOD_MAX, clampMod, defaultConfigFor, resolveConfig, referenceAll, isCellCached, ivsKeyOf,
+    ATK_PCT_MIN, ATK_PCT_MAX, POWER_ADD_MIN, POWER_ADD_MAX, ATK_PCT_STEP, POWER_ADD_STEP,
+    MOD_MIN: ATK_PCT_MIN, MOD_MAX: ATK_PCT_MAX,
+    clampAtkPct, clampPowerAdd, clampMod, defaultConfigFor, resolveConfig, referenceAll, isCellCached, ivsKeyOf,
     // 数据
     bindData, getSprite, getSkill, allSprites,
     getAttackerSkills, getDefenderSkills, defaultAttackSkillId, primaryDamageClass, isDamageClassMatched, leanSprite,

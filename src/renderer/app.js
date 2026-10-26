@@ -7,7 +7,7 @@
  *   1. 状态（ui：会被持久化；view：纯界面态）
  *   2. 精灵选择器（三槽共用：属性筛选 → 点选；也支持名字/拼音/首字母/图鉴号）
  *   3. 卡片渲染（技能下拉、配置下拉）
- *   4. 6 格结果（2 攻方 × 3 档）+ 小条摘要
+ *   4. 9 格结果（3 攻方 × 3 档）+ 小条摘要
  *   5. 20 组明细面板（分组清单 / 矩阵 + 三个过滤器）
  *   6. 主进程事件（穿透/小条/在线数据）
  */
@@ -29,19 +29,21 @@
   D.bindData(DATA);
 
   const ui = {
-    slots: { atk1: null, atk2: null, def: null },
-    skills: { atk1: null, atk2: null, def: null },
+    slots: { atk1: null, atk2: null, atk3: null, def: null },
+    skills: { atk1: null, atk2: null, atk3: null, def: null },
     // 当前生效配置（默认按精灵主攻属性给，不再有"自动最优"）
     configs: {
       atk1: { natureKey: null, ivsKey: null },
       atk2: { natureKey: null, ivsKey: null },
+      atk3: { natureKey: null, ivsKey: null },
     },
     /** 用户是否手动改过配置（没改过的话换精灵会重新给默认档） */
-    configTouched: { atk1: false, atk2: false },
-    // 攻方加成（百分比）：攻击加成 → attackerBuff；威力加成 → 内核 flat powerBoost
+    configTouched: { atk1: false, atk2: false, atk3: false },
+    // 攻方加成：攻击加成是百分比（→ attackerBuff）；威力加成是**数值**（→ 内核 flat powerBoost）
     mods: {
-      atk1: { atkPct: 0, powerPct: 0 },
-      atk2: { atkPct: 0, powerPct: 0 },
+      atk1: { atkPct: 0, powerAdd: 0 },
+      atk2: { atkPct: 0, powerAdd: 0 },
+      atk3: { atkPct: 0, powerAdd: 0 },
     },
     maxLayer: 50,
     maxLayerTouched: false,
@@ -59,8 +61,10 @@
     grid: null,
   };
 
-  const ROWS = ['atk1', 'atk2'];
-  const SLOT_NAME = { atk1: '攻①', atk2: '攻②', def: '靶子' };
+  const ROWS = ['atk1', 'atk2', 'atk3'];
+  const SLOT_NAME = { atk1: '攻①', atk2: '攻②', atk3: '多维手', def: '靶子' };
+  /** 「多维手」槽位默认锁定的技能：多维击打（幻系 15 威力，每层星陨 +1 连击） */
+  const MULTI_HIT_SKILL = '多维击打';
 
   let saveTimer = null;
   function saveUI() {
@@ -271,7 +275,9 @@
     if (slot === 'def') {
       ui.skills.def = '__none__';
     } else {
-      ui.skills[slot] = D.defaultAttackSkillId(sprite);
+      const hasMulti = (sprite.skills || []).includes(MULTI_HIT_SKILL);
+      // 「多维手」槽位优先选多维击打；其它槽位照旧取主攻类别里威力最高者
+      ui.skills[slot] = (slot === 'atk3' && hasMulti) ? MULTI_HIT_SKILL : D.defaultAttackSkillId(sprite);
       // 用户没手动改过配置 → 按新精灵主攻属性重新给默认档
       if (!ui.configTouched[slot]) {
         const def = D.defaultConfigFor(sprite);
@@ -288,7 +294,23 @@
   // 4. 卡片渲染
   // -------------------------------------------------------------------------
   /** 首次启动的默认三槽（与主进程 defaultUI 保持一致） */
-  const DEFAULT_SLOTS = { atk1: '暮星辰', atk2: '祭礼巨像', def: '尖嘴狐仙' };
+  const DEFAULT_SLOTS = { atk1: '暮星辰', atk2: '祭礼巨像', atk3: '粉耳星兔', def: '尖嘴狐仙' };
+
+  /**
+   * 「多维手」默认精灵：优先 common_attackers 里带「多维击打」且魔攻最高的一只
+   * （多维击打是幻系魔攻技能），找不到就退回 DEFAULT_SLOTS.atk3 → 常用攻方[2]。
+   */
+  function defaultMultiHitAttacker() {
+    const common = (DATA.others && DATA.others.common_attackers) || [];
+    let best = null;
+    for (const id of common) {
+      const sp = D.getSprite(id);
+      if (!sp || !(sp.skills || []).includes(MULTI_HIT_SKILL)) continue;
+      const power = Math.max(sp.matk || 0, sp.atk || 0);
+      if (!best || power > best.power) best = { id, power };
+    }
+    return best ? best.id : null;
+  }
 
   function ensureValidState() {
     const attackers = (DATA.others && DATA.others.common_attackers) || [];
@@ -298,20 +320,28 @@
 
     if (!D.getSprite(ui.slots.atk1)) ui.slots.atk1 = fallbackAtk(DEFAULT_SLOTS.atk1, attackers[0]);
     if (!D.getSprite(ui.slots.atk2)) ui.slots.atk2 = fallbackAtk(DEFAULT_SLOTS.atk2, attackers[1]);
+    if (!D.getSprite(ui.slots.atk3)) {
+      ui.slots.atk3 = fallbackAtk(defaultMultiHitAttacker() || DEFAULT_SLOTS.atk3, attackers[2] || attackers[0]);
+    }
     if (!D.getSprite(ui.slots.def)) ui.slots.def = fallbackAtk(DEFAULT_SLOTS.def, defenders[0]);
 
     for (const row of ROWS) {
       const sprite = D.getSprite(ui.slots[row]);
       const list = D.getAttackerSkills(sprite);
       const ids = list.map(s => s.id);
-      if (!ui.skills[row] || ids.indexOf(ui.skills[row]) < 0) ui.skills[row] = ids[0] || null;
+      // 「多维手」槽位默认锁到「多维击打」；没有该技能时退回威力最高的攻击技能
+      const preferred = (row === 'atk3' && ids.indexOf(MULTI_HIT_SKILL) >= 0) ? MULTI_HIT_SKILL : (ids[0] || null);
+      if (!ui.skills[row] || ids.indexOf(ui.skills[row]) < 0) ui.skills[row] = preferred;
       if (!ui.mods) ui.mods = {};
-      if (!ui.mods[row]) ui.mods[row] = { atkPct: 0, powerPct: 0 };
-      ui.mods[row].atkPct = D.clampMod(ui.mods[row].atkPct);
-      ui.mods[row].powerPct = D.clampMod(ui.mods[row].powerPct);
+      if (!ui.mods[row]) ui.mods[row] = { atkPct: 0, powerAdd: 0 };
+      // 旧存档里的 powerPct（百分比）无法无损换算成数值，直接丢弃为 0
+      if (ui.mods[row].powerAdd === undefined) ui.mods[row].powerAdd = 0;
+      ui.mods[row].atkPct = D.clampAtkPct(ui.mods[row].atkPct);
+      ui.mods[row].powerAdd = D.clampPowerAdd(ui.mods[row].powerAdd);
 
       if (!ui.configs[row]) ui.configs[row] = { natureKey: null, ivsKey: null };
-      if (!ui.configTouched) ui.configTouched = { atk1: false, atk2: false };
+      if (!ui.configTouched) ui.configTouched = { atk1: false, atk2: false, atk3: false };
+      if (ui.configTouched[row] === undefined) ui.configTouched[row] = false;
       const cfg = ui.configs[row];
       // 旧存档里的 'auto' / 全量键 / 空值 → 一律按精灵主攻属性换算成具体档位
       const natKeys = D.CONFIG_NATURES.map(n => n.nature.up + '>' + n.nature.down);
@@ -333,11 +363,18 @@
     if (!(ui.maxLayer >= 0 && ui.maxLayer <= D.HARD_MAX_LAYER)) ui.maxLayer = D.DEFAULT_MAX_LAYER;
   }
 
+  /** 两个加成各自的夹紧函数与上下界（攻击加成按 %，威力加成按威力点数） */
+  const MOD_SPEC = {
+    atkPct:   { clamp: D.clampAtkPct,   min: D.ATK_PCT_MIN,   max: D.ATK_PCT_MAX },
+    powerAdd: { clamp: D.clampPowerAdd, min: D.POWER_ADD_MIN, max: D.POWER_ADD_MAX },
+  };
+
   /** 把 ui.mods 同步到控件（数值、边界禁用、非 0 高亮） */
   function syncModControls(row) {
-    const mods = (ui.mods && ui.mods[row]) || { atkPct: 0, powerPct: 0 };
-    for (const key of ['atkPct', 'powerPct']) {
-      const v = D.clampMod(mods[key]);
+    const mods = (ui.mods && ui.mods[row]) || { atkPct: 0, powerAdd: 0 };
+    for (const key of ['atkPct', 'powerAdd']) {
+      const spec = MOD_SPEC[key];
+      const v = spec.clamp(mods[key]);
       mods[key] = v;
       const inp = document.querySelector('.mod-input[data-slot="' + row + '"][data-mod="' + key + '"]');
       if (inp) {
@@ -346,16 +383,17 @@
       }
       const minus = document.querySelector('.mod-btn[data-slot="' + row + '"][data-mod="' + key + '"][data-dir="-1"]');
       const plus = document.querySelector('.mod-btn[data-slot="' + row + '"][data-mod="' + key + '"][data-dir="1"]');
-      if (minus) minus.disabled = v <= D.MOD_MIN;
-      if (plus) plus.disabled = v >= D.MOD_MAX;
+      if (minus) minus.disabled = v <= spec.min;
+      if (plus) plus.disabled = v >= spec.max;
     }
   }
 
-  /** 改加成：夹紧到 [-100, 300] 的整数，重算 + 落盘 */
+  /** 改加成：按各自范围夹紧成整数（攻击 % / 威力点数），重算 + 落盘 */
   function setMod(row, key, value) {
-    if (!ui.mods[row]) ui.mods[row] = { atkPct: 0, powerPct: 0 };
+    if (!ui.mods[row]) ui.mods[row] = { atkPct: 0, powerAdd: 0 };
+    const spec = MOD_SPEC[key] || MOD_SPEC.atkPct;
     const before = ui.mods[row][key];
-    const next = D.clampMod(value);
+    const next = spec.clamp(value);
     if (next === before) { syncModControls(row); return next; }
     ui.mods[row][key] = next;
     syncModControls(row);
@@ -364,12 +402,12 @@
     return next;
   }
 
-  /** 加成摘要文本（0 不显示） */
+  /** 加成摘要文本（0 不显示）：攻击按 %，威力按点数 */
   function modsText(row) {
-    const m = (ui.mods && ui.mods[row]) || { atkPct: 0, powerPct: 0 };
+    const m = (ui.mods && ui.mods[row]) || { atkPct: 0, powerAdd: 0 };
     const out = [];
     if (m.atkPct) out.push('攻击' + (m.atkPct > 0 ? '+' : '') + m.atkPct + '%');
-    if (m.powerPct) out.push('威力' + (m.powerPct > 0 ? '+' : '') + m.powerPct + '%');
+    if (m.powerAdd) out.push('威力' + (m.powerAdd > 0 ? '+' : '') + m.powerAdd);
     return out.join(' ');
   }
 
@@ -392,7 +430,7 @@
   }
 
   function renderCards() {
-    for (const slot of ['atk1', 'atk2', 'def']) {
+    for (const slot of ['atk1', 'atk2', 'atk3', 'def']) {
       const sprite = spriteOf(slot);
       const btn = document.querySelector('.picker-btn[data-slot="' + slot + '"]');
       if (!btn) continue;
@@ -448,7 +486,7 @@
   }
 
   // -------------------------------------------------------------------------
-  // 5. 计算与 6 格渲染
+  // 5. 计算与 9 格渲染
   // -------------------------------------------------------------------------
   function tierOf(key) {
     return D.DEFENDER_TIERS.filter(t => t.key === key)[0];
@@ -460,7 +498,7 @@
     let cold = 0;
     for (const row of ROWS) {
       for (const tier of D.DEFENDER_TIERS) {
-        const mods = ui.mods[row] || { atkPct: 0, powerPct: 0 };
+        const mods = ui.mods[row] || { atkPct: 0, powerAdd: 0 };
         const cfg = ui.configs[row] || {};
         const scene = D.buildScene({
           attackerId: ui.slots[row],
@@ -471,7 +509,7 @@
           natureKey: cfg.natureKey,
           ivsKey: cfg.ivsKey,
           atkPct: mods.atkPct,
-          powerPct: mods.powerPct,
+          powerAdd: mods.powerAdd,
         });
         let cell = null;
         try {
@@ -565,7 +603,7 @@
       const sprite = spriteOf(row);
       const nameEl = rowEl.querySelector('.row-name');
       if (nameEl) nameEl.textContent = sprite ? sprite.name : '-';
-      // 行头第二行：该行最优配置的性格（6 格性格一致，只写一次）
+      // 行头第二行：该行生效配置的性格（同一行 3 格共用一个性格，只写一次）
       const cfgEl = rowEl.querySelector('.row-cfg');
       if (cfgEl) {
         const first = grid && grid.cells.filter(c => c.row === row)[0];
@@ -585,7 +623,7 @@
 
     // 底部说明 + 层上限
     const note = $('#gridNote');
-    // 只有「6 格全部真正重算」的耗时才算「全量」；命中缓存 / 半量重算都不覆盖。
+    // 只有「9 格全部真正重算」的耗时才算「全量」；命中缓存 / 半量重算都不覆盖。
     // 多次采样取最小值：一次测量可能正好撞上系统其它进程占 CPU，最小值更接近稳态。
     if (grid && grid.cold === 6 && grid.ms > 2) {
       view.lastFullMs = view.lastFullMs ? Math.min(view.lastFullMs, grid.ms) : grid.ms;
@@ -604,7 +642,7 @@
       return '最快：' + SLOT_NAME[best.row] + ' × ' + best.tier.label + ' → ' + best.L + ' 层';
     })();
     note.innerHTML = '<span>' + esc(killText) + '</span>' +
-      '<span class="note-right" title="6 格 = 2 攻方 × 3 档 × 1 套当前配置 = 6 次伤害求解（明细面板里的 ' + D.CONFIGS.length + ' 组只作参考，点开才算）">全量 ' +
+      '<span class="note-right" title="9 格 = 3 攻方 × 3 档 × 1 套当前配置 = 9 次伤害求解（明细面板里的 ' + D.CONFIGS.length + ' 组只作参考，点开才算）">全量 ' +
       ms + 'ms · ' + (ROWS.length * D.DEFENDER_TIERS.length) + ' 次求解 · 层上限' +
       '<select id="maxLayerSel" class="select" style="height:18px;margin-left:4px;font-size:10px">' +
       [5, 10, 15, 20, 30, 50, 99].map(v => '<option value="' + v + '"' + (v === ui.maxLayer ? ' selected' : '') + '>' + v + '</option>').join('') +
@@ -661,6 +699,93 @@
         '<span class="mt-name">' + esc(defSprite ? defSprite.name : '未选择') + '</span>' +
         '<span class="mt-caret">▾</span>';
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // 6.4 小条态的「⋯」工具下拉
+  // -------------------------------------------------------------------------
+  const moreMenu = { open: false };
+
+  /**
+   * 按当前模式刷新「⋯」菜单里的文字与可用状态。
+   * 小条态下 #btnPass / #btnCollapse 被 CSS 隐藏，所以这两个动作只能从这里操作，
+   * 文案必须反映真实状态（穿透↔接管、展开）。
+   */
+  function refreshMoreMenuLabels() {
+    const pass = document.querySelector('#moreMenu .more-item[data-act="pass"] .more-txt');
+    if (pass) pass.textContent = view.passthrough ? '切到接管' : '切到穿透';
+    const expand = document.querySelector('#moreMenu .more-item[data-act="expand"]');
+    if (expand) {
+      const txt = expand.querySelector('.more-txt');
+      const ico = expand.querySelector('.more-ico');
+      if (txt) txt.textContent = view.collapsed ? '展开面板' : '收成小条';
+      if (ico) ico.textContent = view.collapsed ? '▢' : '▣';
+    }
+    // 靶子/搜索框等其它入口不受影响
+  }
+
+  /** 下拉菜单的锚点：贴在 #btnMore 下方，右侧对齐，不超出窗口 */
+  function positionMoreMenu() {
+    const el = $('#moreMenu');
+    const btn = $('#btnMore');
+    if (!el || !btn) return;
+    const b = btn.getBoundingClientRect();
+    const menuW = el.offsetWidth || 150;
+    // 以按钮右边缘对齐，但不越过窗口右边
+    const left = Math.max(4, Math.min(b.right - menuW, window.innerWidth - menuW - 4));
+    el.style.left = left + 'px';
+    el.style.top = (b.bottom + 4) + 'px';
+  }
+
+  function openMoreMenu() {
+    if (moreMenu.open) return;
+    // 两层浮层不叠：先收掉守方小菜单（它会把窗口撑高，和 ⋯ 菜单抢高度）
+    if (miniMenu.open) closeMiniMenu(false);
+    moreMenu.open = true;
+    const el = $('#moreMenu');
+    const btn = $('#btnMore');
+    if (el) { el.classList.remove('is-hidden'); el.setAttribute('aria-hidden', 'false'); }
+    if (btn) { btn.classList.add('is-on'); btn.setAttribute('aria-expanded', 'true'); }
+    refreshMoreMenuLabels();
+    positionMoreMenu();
+    // 菜单比 46px 高：让小条临时撑高，否则菜单会被窗口裁掉
+    syncMoreMenuHeight();
+  }
+
+  /**
+   * 关闭「⋯」菜单。
+   * @param {boolean} [restore] false = 不动窗口尺寸（后面马上要切模式，交给主进程处理）
+   * @returns {Promise<void>} restore 为真时，等主进程把窗口收回 46px 后再返回
+   *
+   * 为什么需要 await：菜单是靠 tempExpand(true) 把窗口撑高的，主进程因此把
+   * tempExpandedFromMini 置为 true。切到「展开面板」时若不清掉这个标志，
+   * setCollapsed(false) 会先 closeMiniAndRestore 把窗口还原，状态机就乱了。
+   */
+  async function closeMoreMenu(restore) {
+    if (!moreMenu.open) return;
+    moreMenu.open = false;
+    const el = $('#moreMenu');
+    const btn = $('#btnMore');
+    if (el) { el.classList.add('is-hidden'); el.setAttribute('aria-hidden', 'true'); }
+    if (btn) { btn.classList.remove('is-on'); btn.setAttribute('aria-expanded', 'false'); }
+    if (restore !== false && api && view.collapsed) {
+      // 只有小条态才需要把窗口收回 46px
+      try { await api.tempExpand(false); } catch (e) { /* 忽略 */ }
+    }
+  }
+
+  /** 把「标题栏 + 下拉菜单」的总高度交给主进程撑开小条 */
+  function syncMoreMenuHeight() {
+    if (!api || !api.tempExpand) return;
+    if (!view.collapsed || !moreMenu.open) return;
+    const el = $('#moreMenu');
+    const bar = $('#titlebar');
+    const barH = bar ? bar.getBoundingClientRect().height : 38;
+    const menuH = el ? el.scrollHeight : 120;
+    const h = Math.max(160, Math.min(320, Math.round(barH + menuH + 14)));
+    try { api.tempExpand(true, h); } catch (e) { /* 忽略 */ }
+    // 撑高后按钮位置会变（同一行，一般不变），再校正一次
+    requestAnimationFrame(positionMoreMenu);
   }
 
   // -------------------------------------------------------------------------
@@ -1127,8 +1252,10 @@
       const mcell = e.target.closest('.mcell');
       if (mcell) {
         view.highlight = Number(mcell.getAttribute('data-index'));
-        $$('#detailBody .mcell.is-sel').forEach(el => el.classList.remove('is-sel'));
-        mcell.classList.add('is-sel');
+        // 点击高亮用 is-pick（styles.css 里是白描边）：与 renderMatrix 里 view.highlight 用的是同一个类，
+        // 重渲染后高亮才不会丢。is-sel 保留给「当前配置」那一格。
+        $$('#detailBody .mcell.is-pick').forEach(el => el.classList.remove('is-pick'));
+        mcell.classList.add('is-pick');
         $('#detailFoot').textContent = footText(currentDetailEntry(), view.highlight);
         return;
       }
@@ -1209,14 +1336,15 @@
       });
     }
 
-    // 攻方加成：−/+ 按 50 步进；输入框失焦/回车生效
+    // 攻方加成：按钮步进由 data-step 决定（攻击 ±50%，威力 ±20 点）；输入框失焦/回车生效
     $$('.mod-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const row = btn.getAttribute('data-slot');
         const key = btn.getAttribute('data-mod');
         const dir = Number(btn.getAttribute('data-dir')) || 1;
+        const step = Number(btn.getAttribute('data-step')) || 0;
         const cur = (ui.mods[row] && ui.mods[row][key]) || 0;
-        setMod(row, key, cur + dir * 50);
+        setMod(row, key, cur + dir * step);
       });
     });
     $$('.mod-input').forEach(inp => {
@@ -1255,7 +1383,7 @@
       const t = e.target;
       if (!t || !t.closest) { closeMiniMenu(); return; }
       if (t.closest('#miniMenu') || t.closest('#miniTarget') || t.closest('#miniSearch')) return;
-      if (t.closest('#btnCollapse') || t.closest('#btnPass') || t.closest('#btnClose')) return; // 交给它们自己的逻辑
+      if (t.closest('#btnCollapse') || t.closest('#btnPass') || t.closest('#btnClose') || t.closest('#btnMore') || t.closest('#moreMenu')) return; // 交给它们自己的逻辑
       closeMiniMenu();
     };
     document.addEventListener('mousedown', outsideHandler, true);
@@ -1263,9 +1391,10 @@
     // 窗口失焦（点了桌面/别的窗口）——与主进程 blur 双保险：谁先到谁关
     window.addEventListener('blur', () => {
       if (miniMenu.open) closeMiniMenu();
+      if (moreMenu.open) closeMoreMenu();
     });
 
-    // ⓘ：重新展开/收起使用提示
+    // ⌘：展开/收起快捷键面板（原「使用提示」条已改造为快捷键列表）
     const btnTip = $('#btnTip');
     if (btnTip) {
       btnTip.addEventListener('click', () => {
@@ -1274,15 +1403,78 @@
         const show = el.classList.contains('is-hidden');
         el.classList.toggle('is-hidden', !show);
         btnTip.classList.toggle('is-on', show);
-        if (!show) { ui.tipDismissed = true; saveUI(); }
         scheduleAutoHeight();
       });
     }
+
+    // 「⋯」更多菜单（小条态的按钮收纳）
+    const btnMore = $('#btnMore');
+    if (btnMore) {
+      btnMore.addEventListener('click', e => {
+        e.stopPropagation();
+        if (moreMenu.open) closeMoreMenu();
+        else openMoreMenu();
+      });
+    }
+    const moreEl = $('#moreMenu');
+    if (moreEl) {
+      moreEl.addEventListener('click', e => {
+        const item = e.target.closest ? e.target.closest('.more-item') : null;
+        if (!item) return;
+        e.stopPropagation();
+        const act = item.getAttribute('data-act');
+        if (act === 'tip') {
+          // 快捷键面板在展开态才看得到：先把窗口展开，再显示面板
+          closeMoreMenu().then(() => {
+            const expandFirst = view.collapsed;
+            const reveal = () => {
+              const el = $('#tip');
+              if (!el) return;
+              el.classList.remove('is-hidden');
+              $('#btnTip') && $('#btnTip').classList.add('is-on');
+              scheduleAutoHeight();
+            };
+            if (expandFirst && api) {
+              api.toggleCollapse();
+              // 等窗口展开动画/尺寸落定后再显示，否则面板会被 46px 裁掉
+              setTimeout(reveal, 420);
+            } else {
+              reveal();
+            }
+          });
+        } else if (act === 'pass') {
+          closeMoreMenu();
+          if (api) api.togglePassthrough();
+        } else if (act === 'expand') {
+          // 先把「菜单撑高」这一层收掉（清掉主进程的 tempExpandedFromMini），再切模式
+          closeMoreMenu().then(() => { if (api) api.toggleCollapse(); });
+        } else if (act === 'close') {
+          closeMoreMenu();
+          if (api) api.close();
+        }
+      });
+    }
+    // 点菜单外部 → 关闭
+    document.addEventListener('mousedown', e => {
+      if (!moreMenu.open) return;
+      const t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('#moreMenu') || t.closest('#btnMore')) return;
+      closeMoreMenu();
+    }, true);
 
     // 标题栏按钮
     $('#btnPass').addEventListener('click', () => {
       if (api) api.togglePassthrough();
     });
+    // 小条状态圆点：点一下切换 接管 / 穿透
+    const miniStatusBtn = $('#miniStatus');
+    if (miniStatusBtn) {
+      miniStatusBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        if (api) api.togglePassthrough();
+      });
+    }
     // 收起 / 展开：交给主进程翻转（渲染层的 view.collapsed 只用于显示文字）
     $('#btnCollapse').addEventListener('click', () => {
       if (api) api.toggleCollapse();
@@ -1291,15 +1483,17 @@
       if (api) api.close();
     });
     $('#tipClose').addEventListener('click', () => {
-      ui.tipDismissed = true;
       $('#tip').classList.add('is-hidden');
-      saveUI();
+      const b = $('#btnTip');
+      if (b) b.classList.remove('is-on');
+      scheduleAutoHeight();
     });
 
     // 全局键盘
     document.addEventListener('keydown', e => {
       if (e.defaultPrevented) return; // 内层（搜索框等）已经处理过，别重复执行
       if (e.key === 'Escape') {
+        if (moreMenu.open) { closeMoreMenu(); return; }
         if (miniMenu.open) { closeMiniMenu(); return; }
         if (!$('#picker').classList.contains('is-hidden')) { closePicker(); return; }
         if (!$('#detail').classList.contains('is-hidden')) { closeDetail(); return; }
@@ -1369,6 +1563,19 @@
     } catch (e) { /* 忽略 */ }
   }
 
+  /** 小条右侧的状态圆点：接管中 = 金色实心，穿透 = 红色空心 */
+  function renderMiniStatus() {
+    const el = $('#miniStatus');
+    if (!el) return;
+    const takeover = !view.passthrough;
+    el.classList.toggle('is-takeover', takeover);
+    el.classList.toggle('is-passthrough', !takeover);
+    el.setAttribute('aria-label', takeover ? '接管中' : '穿透');
+    el.title = takeover
+      ? '当前：接管鼠标（可点击浮窗）· 点此交还鼠标'
+      : '当前：点击穿透（鼠标交给游戏）· 点此接管';
+  }
+
   function applyMode(mode) {
     if (!mode) return;
     view.collapsed = !!mode.collapsed;
@@ -1376,10 +1583,13 @@
     document.body.classList.toggle('collapsed', view.collapsed);
     // 展开态不该留着小菜单（窗口尺寸已由主进程接管，这里只隐藏）
     if (!view.collapsed && miniMenu.open) closeMiniMenu(false);
+    if (!view.collapsed && moreMenu.open) closeMoreMenu(false);
     document.body.classList.toggle('passthrough', view.passthrough);
     $('#btnPass').classList.toggle('is-on', !view.passthrough);
     $('#btnPass').textContent = view.passthrough ? '穿透' : '接管中';
     $('#btnCollapse').textContent = view.collapsed ? '展开' : '收起';
+    refreshMoreMenuLabels();
+    renderMiniStatus();
     if (view.collapsed) renderMinibar();
     reportRects('mode');
   }
@@ -1417,7 +1627,7 @@
   // -------------------------------------------------------------------------
   /**
    * JIT 预热：先跑一遍全量（结果丢弃、缓存清空），让 V8 把热路径编译掉。
-   * 不做的话首屏会把 ~60ms 的编译开销算进「6 格耗时」里。
+   * 不做的话首屏会把 ~60ms 的编译开销算进「9 格耗时」里。
    */
   function runAllScenes() {
     for (const row of ROWS) {
@@ -1437,7 +1647,7 @@
   /**
    * 预热 + 计时：
    *   ① 立刻跑一遍全量 → 结果进缓存，首屏窗口一出现就是最终数字（零等待）
-   *   ② 界面稳定后再清缓存跑一遍并计时 → 这才是「6 格全量冷算」的稳态耗时，
+   *   ② 界面稳定后再清缓存跑一遍并计时 → 这才是「9 格全量冷算」的稳态耗时，
    *      直接写进结果区右下角，避免把首帧的 JIT/排版开销算进去。
    */
   function warmup() {
@@ -1476,11 +1686,12 @@
           if (st.ui.configs) Object.assign(ui.configs, st.ui.configs);
           if (st.ui.configTouched) Object.assign(ui.configTouched, st.ui.configTouched);
           if (st.ui.mods) {
-            for (const row of ['atk1', 'atk2']) {
+            for (const row of ['atk1', 'atk2', 'atk3']) {
               const m = st.ui.mods[row] || {};
               ui.mods[row] = {
-                atkPct: D.clampMod(m.atkPct),
-                powerPct: D.clampMod(m.powerPct),
+                atkPct: D.clampAtkPct(m.atkPct),
+                // 旧存档的 powerPct 是百分比口径，无法换算成威力点数 → 归零
+                powerAdd: D.clampPowerAdd(m.powerAdd),
               };
             }
           }
@@ -1492,15 +1703,17 @@
       } catch (e) { /* 忽略，用默认值 */ }
     }
 
-    // 提示条：默认只在首次显示（关掉后可通过标题栏 ⓘ 重新展开）
+    // 快捷键面板：默认收起，点标题栏 ⌘ 或小条 ⋯ → 快捷键 打开
+    // （原来是"首次启动显示一次的使用提示条"，现在改成纯快捷键速查，不主动弹出）
     const tipEl = $('#tip');
-    if (tipEl) tipEl.classList.toggle('is-hidden', !!ui.tipDismissed);
+    if (tipEl) tipEl.classList.add('is-hidden');
 
     ensureValidState();
     renderCards();
     bindEvents();
     window.addEventListener('resize', () => reportRects('resize'));
     reportRects('boot');
+    renderMiniStatus(); // 首帧就把圆点画对（applyMode 可能早于 DOM 就绪）
     warmup();     // V8 预热：让首屏显示的耗时是真实稳态值
     recompute();
     initData();

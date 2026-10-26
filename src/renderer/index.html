@@ -23,15 +23,27 @@
         <span id="miniSum" class="mini-sum"></span>
         <span class="mini-sep"></span>
         <button id="miniTarget" class="mini-target" title="更换防御靶子"></button>
-        <input id="miniSearch" class="mini-search" type="text" placeholder="搜守方…"
+        <input id="miniSearch" class="mini-search" type="text" placeholder="守方…"
                autocomplete="off" spellcheck="false" />
+        <!-- 接管/穿透 状态圆点（小条态专用；点击可直接切换） -->
+        <button id="miniStatus" class="mini-status" title="点击切换 接管 / 穿透" aria-label="接管状态"></button>
       </div>
 
+      <!-- 右侧工具区：展开态平铺 3 个按钮；小条态收进「⋯」下拉（见 styles.css 的 body.collapsed 规则） -->
       <div class="win-btns">
-          <button id="btnTip" class="wbtn wbtn-tip" title="使用提示">ⓘ</button>
+        <button id="btnTip" class="wbtn wbtn-tip" title="快捷键一览">⌘</button>
         <button id="btnPass" class="wbtn" title="点击穿透开关（Ctrl+Alt+T）">穿透</button>
         <button id="btnCollapse" class="wbtn" title="收成小条（Ctrl+Shift+M）">收起</button>
         <button id="btnClose" class="wbtn wbtn-danger" title="关闭浮窗">✕</button>
+        <button id="btnMore" class="wbtn wbtn-more" title="更多操作" aria-haspopup="true" aria-expanded="false">⋯</button>
+      </div>
+
+      <!-- 小条态的工具下拉菜单 -->
+      <div id="moreMenu" class="more-menu is-hidden" aria-hidden="true">
+        <button class="more-item" data-act="tip"><i class="more-ico">⌘</i><span class="more-txt">快捷键</span></button>
+        <button class="more-item" data-act="pass"><i class="more-ico">⇄</i><span class="more-txt">穿透 / 接管</span></button>
+        <button class="more-item" data-act="expand"><i class="more-ico">▢</i><span class="more-txt">展开面板</span></button>
+        <button class="more-item is-danger" data-act="close"><i class="more-ico">✕</i><span class="more-txt">关闭浮窗</span></button>
       </div>
     </header>
 
@@ -48,10 +60,18 @@
     <!-- ② 主内容 -->
     <main id="content">
 
-            <div id="tip" class="tip is-hidden">
-        <span class="tip-icon">!</span>
-        <span class="tip-text">游戏请设为「无边框窗口全屏」，独占全屏可能压不住浮窗。</span>
-        <button id="tipClose" class="tip-close" title="知道了">✕</button>
+      <!-- 快捷键面板（标题栏 ⓘ / 小条 ⋯ → 快捷键 打开；默认隐藏） -->
+      <div id="tip" class="tip is-hidden">
+        <div class="tip-head">
+          <span class="tip-title">快捷键</span>
+          <button id="tipClose" class="tip-close" title="关闭">✕</button>
+        </div>
+        <div class="sc-list">
+          <div class="sc-row"><kbd>Alt</kbd><kbd>X</kbd><span>呼出并接管鼠标 · 再按交还</span></div>
+          <div class="sc-row"><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>T</kbd><span>切换 穿透 / 接管</span></div>
+          <div class="sc-row"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>M</kbd><span>收成小条 / 展开</span></div>
+          <div class="sc-row"><kbd>Esc</kbd><span>逐层关闭面板 · 全关后交还鼠标</span></div>
+        </div>
       </div>
 
       <section class="card slot-card" data-slot="atk1">
@@ -67,17 +87,16 @@
         <div class="mods" data-slot="atk1">
           <div class="mod-item">
             <span class="mod-label">攻击加成</span>
-            <button class="mod-btn" data-slot="atk1" data-mod="atkPct" data-dir="-1" title="-50%">−</button>
+            <button class="mod-btn" data-slot="atk1" data-mod="atkPct" data-dir="-1" data-step="50" title="-50%">−</button>
             <input class="mod-input" type="number" step="50" min="-100" max="300" value="0" data-slot="atk1" data-mod="atkPct" title="可直接输入任意整数（-100 ~ 300）">
             <span class="mod-unit">%</span>
-            <button class="mod-btn" data-slot="atk1" data-mod="atkPct" data-dir="1" title="+50%">+</button>
+            <button class="mod-btn" data-slot="atk1" data-mod="atkPct" data-dir="1" data-step="50" title="+50%">+</button>
           </div>
           <div class="mod-item">
             <span class="mod-label">威力加成</span>
-            <button class="mod-btn" data-slot="atk1" data-mod="powerPct" data-dir="-1" title="-50%">−</button>
-            <input class="mod-input" type="number" step="50" min="-100" max="300" value="0" data-slot="atk1" data-mod="powerPct" title="可直接输入任意整数（-100 ~ 300）">
-            <span class="mod-unit">%</span>
-            <button class="mod-btn" data-slot="atk1" data-mod="powerPct" data-dir="1" title="+50%">+</button>
+            <button class="mod-btn" data-slot="atk1" data-mod="powerAdd" data-dir="-1" data-step="20" title="-20 威力">−</button>
+            <input class="mod-input" type="number" step="20" min="-100" max="300" value="0" data-slot="atk1" data-mod="powerAdd" title="威力数值加成：直接加到技能威力上（-100 ~ +300，每档 20）">
+            <button class="mod-btn" data-slot="atk1" data-mod="powerAdd" data-dir="1" data-step="20" title="+20 威力">+</button>
           </div>
           <span class="cfg-hint" data-slot="atk1"></span>
         </div>
@@ -96,19 +115,47 @@
         <div class="mods" data-slot="atk2">
           <div class="mod-item">
             <span class="mod-label">攻击加成</span>
-            <button class="mod-btn" data-slot="atk2" data-mod="atkPct" data-dir="-1" title="-50%">−</button>
+            <button class="mod-btn" data-slot="atk2" data-mod="atkPct" data-dir="-1" data-step="50" title="-50%">−</button>
             <input class="mod-input" type="number" step="50" min="-100" max="300" value="0" data-slot="atk2" data-mod="atkPct" title="可直接输入任意整数（-100 ~ 300）">
             <span class="mod-unit">%</span>
-            <button class="mod-btn" data-slot="atk2" data-mod="atkPct" data-dir="1" title="+50%">+</button>
+            <button class="mod-btn" data-slot="atk2" data-mod="atkPct" data-dir="1" data-step="50" title="+50%">+</button>
           </div>
           <div class="mod-item">
             <span class="mod-label">威力加成</span>
-            <button class="mod-btn" data-slot="atk2" data-mod="powerPct" data-dir="-1" title="-50%">−</button>
-            <input class="mod-input" type="number" step="50" min="-100" max="300" value="0" data-slot="atk2" data-mod="powerPct" title="可直接输入任意整数（-100 ~ 300）">
-            <span class="mod-unit">%</span>
-            <button class="mod-btn" data-slot="atk2" data-mod="powerPct" data-dir="1" title="+50%">+</button>
+            <button class="mod-btn" data-slot="atk2" data-mod="powerAdd" data-dir="-1" data-step="20" title="-20 威力">−</button>
+            <input class="mod-input" type="number" step="20" min="-100" max="300" value="0" data-slot="atk2" data-mod="powerAdd" title="威力数值加成：直接加到技能威力上（-100 ~ +300，每档 20）">
+            <button class="mod-btn" data-slot="atk2" data-mod="powerAdd" data-dir="1" data-step="20" title="+20 威力">+</button>
           </div>
           <span class="cfg-hint" data-slot="atk2"></span>
+        </div>
+      </section>
+
+      <!-- 多维手：第三个攻方，默认锁「多维击打」（幻系不引爆星陨） -->
+      <section class="card slot-card" data-slot="atk3">
+        <div class="slot-line">
+          <span class="slot-tag atk">多维手</span>
+          <button class="picker-btn" data-slot="atk3" title="多维手：默认锁「多维击打」（幻系 15 威力，每层星陨 +1 连击）"></button>
+        </div>
+        <div class="slot-line slot-selects">
+          <select class="select skill-select" data-slot="atk3" title="技能"></select>
+          <select class="select cfg-nature" data-slot="atk3" title="性格"></select>
+          <select class="select cfg-ivs" data-slot="atk3" title="加点"></select>
+        </div>
+        <div class="mods" data-slot="atk3">
+          <div class="mod-item">
+            <span class="mod-label">攻击加成</span>
+            <button class="mod-btn" data-slot="atk3" data-mod="atkPct" data-dir="-1" data-step="50" title="-50%">−</button>
+            <input class="mod-input" type="number" step="50" min="-100" max="300" value="0" data-slot="atk3" data-mod="atkPct" title="可直接输入任意整数（-100 ~ 300）">
+            <span class="mod-unit">%</span>
+            <button class="mod-btn" data-slot="atk3" data-mod="atkPct" data-dir="1" data-step="50" title="+50%">+</button>
+          </div>
+          <div class="mod-item">
+            <span class="mod-label">威力加成</span>
+            <button class="mod-btn" data-slot="atk3" data-mod="powerAdd" data-dir="-1" data-step="20" title="-20 威力">−</button>
+            <input class="mod-input" type="number" step="20" min="-100" max="300" value="0" data-slot="atk3" data-mod="powerAdd" title="威力数值加成：直接加到技能威力上（-100 ~ +300，每档 20）">
+            <button class="mod-btn" data-slot="atk3" data-mod="powerAdd" data-dir="1" data-step="20" title="+20 威力">+</button>
+          </div>
+          <span class="cfg-hint" data-slot="atk3"></span>
         </div>
       </section>
 
@@ -121,7 +168,7 @@
         </div>
       </section>
 
-      <!-- ③ 结果：2 攻方 × 3 档 -->
+      <!-- ③ 结果：3 攻方 × 3 档 = 9 格 -->
       <section class="grid-wrap">
         <div class="grid-head">
           <span class="grid-corner"></span>
@@ -140,6 +187,9 @@
         </div>
         <div class="grid-row" data-row="atk2">
           <div class="row-head"><b>攻② <span class="row-name"></span></b><i class="row-cfg"></i></div>
+        </div>
+        <div class="grid-row" data-row="atk3">
+          <div class="row-head"><b>多维 <span class="row-name"></span></b><i class="row-cfg"></i></div>
         </div>
         <div class="grid-note" id="gridNote"></div>
       </section>

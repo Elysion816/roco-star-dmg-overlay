@@ -19,7 +19,7 @@ const ICON_PNG = path.join(ROOT, 'src', 'assets', 'icon.png');
 const PRELOAD = path.join(__dirname, 'preload.js');
 const INDEX = path.join(ROOT, 'src', 'renderer', 'index.html');
 
-const WIN_DEFAULT = { width: 620, height: 800 };
+const WIN_DEFAULT = { width: 620, height: 880 };
 const COLLAPSED_HEIGHT = 46;
 const MIN_WIDTH = 460;
 const MIN_HEIGHT = 46;
@@ -78,16 +78,22 @@ const DATA_CACHE_DIR = () => path.join(app.getPath('userData'), 'data');
 function defaultUI() {
   return {
     // 默认组合：两只攻方在默认三档上都打得出数（暮星辰 9~3 层 / 祭礼巨像 5~3 层）
-    slots: { atk1: '暮星辰', atk2: '祭礼巨像', def: '尖嘴狐仙' },
+    slots: { atk1: '暮星辰', atk2: '祭礼巨像', atk3: '粉耳星兔', def: '尖嘴狐仙' },
     // 技能：null = 自动（攻击方取威力最高，防御方取「无」）
-    skills: { atk1: null, atk2: null, def: null },
+    skills: { atk1: null, atk2: null, atk3: null, def: null },
     // 攻方配置：具体 natureKey / ivsKey（null = 由渲染层按主攻属性给默认档）
     configs: {
       atk1: { natureKey: null, ivsKey: null },
       atk2: { natureKey: null, ivsKey: null },
+      atk3: { natureKey: null, ivsKey: null },
     },
-    configTouched: { atk1: false, atk2: false },
-    mods: { atk1: { atkPct: 0, powerPct: 0 }, atk2: { atkPct: 0, powerPct: 0 } },
+    configTouched: { atk1: false, atk2: false, atk3: false },
+    // 攻击加成是百分比；威力加成是**威力点数**（直接加到技能威力上）
+    mods: {
+      atk1: { atkPct: 0, powerAdd: 0 },
+      atk2: { atkPct: 0, powerAdd: 0 },
+      atk3: { atkPct: 0, powerAdd: 0 },
+    },
     maxLayer: 50,
     tipDismissed: false,
     maxLayerTouched: false,
@@ -115,6 +121,14 @@ function loadState() {
     state.ui.slots = Object.assign(defaultUI().slots, (parsed.ui && parsed.ui.slots) || {});
     state.ui.skills = Object.assign(defaultUI().skills, (parsed.ui && parsed.ui.skills) || {});
     state.ui.configs = Object.assign(defaultUI().configs, (parsed.ui && parsed.ui.configs) || {});
+    // 加成迁移到新结构：旧存档的 powerPct 是「百分比」口径，与新版「威力点数」不可互换 → 丢弃为 0
+    for (const row of ['atk1', 'atk2', 'atk3']) {
+      const m = (state.ui.mods && state.ui.mods[row]) || {};
+      state.ui.mods[row] = {
+        atkPct: Number(m.atkPct) || 0,
+        powerAdd: Number(m.powerAdd) || 0,
+      };
+    }
     state.collapsed = false; // 关闭时若处于小条，下次启动仍展开（避免看不到内容）
   } catch (e) {
     // 首次启动 / 文件损坏：用默认值
@@ -647,7 +661,8 @@ function registerIPC() {
   ipcMain.handle('win:auto-height', (_e, height) => {
     if (!win || collapsed || tempExpandedFromMini) return false;
     if (state.window.heightUserSet) return false; // 尊重用户手动高度
-    const h = Math.max(480, Math.min(900, Math.round(Number(height) || 0)));
+    // 三攻方后内容更高：上限从 900 抬到 1000（3 卡片 + 3 行结果）
+    const h = Math.max(480, Math.min(1000, Math.round(Number(height) || 0)));
     if (!h) return false;
     const b = win.getBounds();
     if (Math.abs(b.height - h) < 2) return false;

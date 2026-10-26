@@ -6,7 +6,8 @@
  * 用 executeJavaScript 驱动 UI：开选择器 → 搜索 → 选中 → 明细 → 矩阵 → 靶子选择器，
  * 每步截图并统计不透明像素占比——「整窗变透明」这类合成问题会直接体现在占比上。
  *
- * 截图输出：_intermediates/smoke-*.png
+ * 截图输出：默认 <app>/_intermediates/smoke-*.png；用 XY_SMOKE_OUT=<dir> 覆盖
+ *          （在打包版里跑自检必须覆盖，否则会写进 resources/app 污染绿色包）
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -15,7 +16,12 @@ const { globalShortcut, screen } = require('electron');
 function createRunner(win, app, ROOT) {
   const js = code => win.webContents.executeJavaScript(code, true);
   const wait = ms => new Promise(r => setTimeout(r, ms));
-  const outDir = path.join(ROOT, '_intermediates');
+  // 截图输出目录：默认 <app>/_intermediates。
+  // 用 XY_SMOKE_OUT 覆盖——在**打包版**里跑自检时 ROOT 是 resources/app，
+  // 不覆盖就会把 50+ 张截图写进绿色包，污染待发布的产物。
+  const outDir = process.env.XY_SMOKE_OUT
+    ? path.resolve(process.env.XY_SMOKE_OUT)
+    : path.join(ROOT, '_intermediates');
 
   async function capture(name) {
     try {
@@ -46,7 +52,7 @@ function createRunner(win, app, ROOT) {
   }
 
   let lastBox = null;
-  return { js, wait, capture, getBox: () => lastBox };
+  return { js, wait, capture, getBox: () => lastBox, outDir };
 }
 
 async function run(win, app, ROOT) {
@@ -194,12 +200,81 @@ async function run(win, app, ROOT) {
 
     await js('document.getElementById("btnCollapse").click()');
     await wait(450);
-    results.collapse.afterCollapse = await js('({ height: 0, bodyClass: document.body.className, btn: document.getElementById("btnCollapse").textContent, mini: (document.getElementById("minibar")||{}).textContent || "", contentDisplay: getComputedStyle(document.getElementById("content")).display, hit: (function(){ var b = document.getElementById("btnCollapse"); var r = b.getBoundingClientRect(); var el = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2); return el ? (el.id || el.className || el.tagName) : null; })() })');
+    // 小条态下 btnCollapse 已被收进「⋯」，命中检测改测 ⋯ 按钮本身
+    results.collapse.afterCollapse = await js('({ height: 0, bodyClass: document.body.className, btn: document.getElementById("btnCollapse").textContent, mini: (document.getElementById("minibar")||{}).textContent || "", contentDisplay: getComputedStyle(document.getElementById("content")).display, hit: (function(){ var b = document.getElementById("btnMore"); if (!b) return null; var r = b.getBoundingClientRect(); var el = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2); return el ? (el.id || el.className || el.tagName) : null; })() })');
     results.collapse.afterCollapse.realHeight = win.getBounds().height;
+
+    // 小条布局：三攻方是否都在、搜索框收窄、「⋯」是否收纳了其它按钮、状态圆点
+    results.collapse.miniLayout = await js('(function(){'
+      + ' var w = function(s){ var e=document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().width) : null; };'
+      + ' var disp = function(s){ var e=document.querySelector(s); return e ? getComputedStyle(e).display : null; };'
+      + ' var tb = document.getElementById("titlebar");'
+      + ' return {'
+      + '   winW: window.innerWidth,'
+      + '   sum: w("#miniSum"), target: w("#miniTarget"), search: w("#miniSearch"), btns: w(".win-btns"),'
+      + '   overflow: tb.scrollWidth - tb.clientWidth,'
+      + '   dispTip: disp("#btnTip"), dispPass: disp("#btnPass"), dispCollapse: disp("#btnCollapse"), dispClose: disp("#btnClose"), dispMore: disp("#btnMore"),'
+      + '   status: (function(){ var e=document.getElementById("miniStatus"); if(!e) return null;'
+      + '     var cs=getComputedStyle(e,"::before");'
+      + '     return { disp: getComputedStyle(e).display, cls: e.className, aria: e.getAttribute("aria-label"),'
+      + '       w: Math.round(e.getBoundingClientRect().width),'
+      + '       dotW: cs.width, dotBg: cs.backgroundColor, dotBorder: cs.borderTopColor }; })(),'
+      + '   targetName: (document.querySelector("#miniTarget .mt-name")||{}).textContent,'
+      + '   targetClipped: (function(){ var n=document.querySelector("#miniTarget .mt-name"); return n ? n.scrollWidth > n.clientWidth + 1 : null; })(),'
+      + '   items: Array.prototype.map.call(document.querySelectorAll(".mini-item"), function(e){'
+      + '     return { t: e.textContent.replace(/\s+/g," ").trim(), w: Math.round(e.getBoundingClientRect().width), clipped: e.scrollWidth > e.clientWidth + 1 }; }),'
+      + '   names: Array.prototype.map.call(document.querySelectorAll(".mini-item .mini-name"), function(e){'
+      + '     return { t: e.textContent, clipped: e.scrollWidth > e.clientWidth + 1, w: Math.round(e.getBoundingClientRect().width) }; })'
+      + ' }; })()');
+
+    // 「⋯」下拉：点开 → 菜单在窗口内、四项齐全、窗口被撑高 → 再点收回
+    await js('document.getElementById("btnMore").click()');
+    await wait(600);
+    results.collapse.moreMenu = await js('(function(){'
+      + ' var m = document.getElementById("moreMenu"); var b = m.getBoundingClientRect();'
+      + ' return { visible: !m.classList.contains("is-hidden"), w: Math.round(b.width), h: Math.round(b.height),'
+      + '   insideRight: b.right <= window.innerWidth + 1, insideBottom: b.bottom <= window.innerHeight + 1,'
+      + '   items: Array.prototype.map.call(m.querySelectorAll(".more-item .more-txt"), function(e){ return e.textContent.trim(); }) }; })()');
+    results.collapse.moreMenuWinH = win.getBounds().height;
+    // 关键：撑高后菜单必须完整落在窗口内（46px 时菜单只有一半可见）
+    results.collapse.moreMenuFits = await js('(function(){'
+      + ' var m = document.getElementById("moreMenu"); var b = m.getBoundingClientRect();'
+      + ' return { bottomGap: Math.round(window.innerHeight - b.bottom), rightGap: Math.round(window.innerWidth - b.right), winH: window.innerHeight }; })()');
+    results.a14b = await capture('smoke-14b-cold-mini-more-menu.png');
+    await js('document.getElementById("btnMore").click()');
+    await wait(600);
+    results.collapse.moreMenuClosed = await js('(function(){ return { hidden: document.getElementById("moreMenu").classList.contains("is-hidden") }; })()');
+    results.collapse.moreMenuClosedWinH = win.getBounds().height;
+
+    // 快捷键面板（原「使用提示」条改造）：点标题栏 ⌘ 应展开、4 行 9 个键帽
+    await js('document.getElementById("btnTip").click()');
+    await wait(350);
+    results.collapse.shortcutPanel = await js('(function(){ var e=document.getElementById("tip"); var b=e.getBoundingClientRect();'
+      + ' return { open: !e.classList.contains("is-hidden"), h: Math.round(b.height), rows: e.querySelectorAll(".sc-row").length,'
+      + '   kbds: e.querySelectorAll("kbd").length, title: (e.querySelector(".tip-title")||{}).textContent,'
+      + '   btnOn: document.getElementById("btnTip").classList.contains("is-on") }; })()');
+    results.aTip = await capture('smoke-14c-shortcut-panel.png');
+    await js('document.getElementById("tipClose").click()');
+    await wait(250);
+    results.collapse.shortcutPanelClosed = await js('(function(){ var e=document.getElementById("tip");'
+      + ' return { hidden: e.classList.contains("is-hidden"), btnOn: document.getElementById("btnTip").classList.contains("is-on") }; })()');
+
+    // 状态圆点：接管 → 穿透 应改变颜色/文案（小条态下这是唯一的常驻状态指示）
+    results.collapse.dotTakeover = await js('(function(){ var e=document.getElementById("miniStatus"); var cs=getComputedStyle(e,"::before");'
+      + ' return { cls: e.className, aria: e.getAttribute("aria-label"), w: Math.round(e.getBoundingClientRect().width), dotBg: cs.backgroundColor, dotBorder: cs.borderTopColor }; })()');
+    await js('window.api.setPassthrough(true)');
+    await wait(400);
+    results.collapse.dotPassthrough = await js('(function(){ var e=document.getElementById("miniStatus"); var cs=getComputedStyle(e,"::before");'
+      + ' return { cls: e.className, aria: e.getAttribute("aria-label"), w: Math.round(e.getBoundingClientRect().width), dotBg: cs.backgroundColor, dotBorder: cs.borderTopColor }; })()');
+    await js('window.api.setPassthrough(false)');
+    await wait(300);
     results.a9 = await capture('smoke-9-collapsed.png');
 
-    await js('document.getElementById("btnCollapse").click()');
-    await wait(450);
+    // 小条态展开：按钮已收进 ⋯，走菜单项 data-act="expand"
+    await js('document.getElementById("btnMore").click()');
+    await wait(400);
+    await js('document.querySelector(\'#moreMenu .more-item[data-act="expand"]\').click()');
+    await wait(500);
     results.collapse.afterExpand = await js('({ bodyClass: document.body.className, btn: document.getElementById("btnCollapse").textContent, cells: document.querySelectorAll(".cell").length, values: Array.prototype.slice.call(document.querySelectorAll(".cell-main")).map(function(e){return e.textContent;}), contentDisplay: getComputedStyle(document.getElementById("content")).display })');
     results.collapse.afterExpand.realHeight = win.getBounds().height;
     results.a10 = await capture('smoke-10-expanded.png');
@@ -260,11 +335,15 @@ async function run(win, app, ROOT) {
     results.leadSeq.passthroughBefore = await js('({ btnPass: document.getElementById("btnPass").textContent, on: document.getElementById("btnPass").classList.contains("is-on") })');
     await js('window.api.toggleCollapse()'); // 与全局快捷键 Ctrl+Shift+M 完全同一条链路
     await wait(500);
-    results.leadSeq.fromPassthroughCollapse = await js('({ btnPass: document.getElementById("btnPass").textContent, btnCollapse: document.getElementById("btnCollapse").textContent, bodyClass: document.body.className, hit: (function(){ var b = document.getElementById("btnCollapse"); var r = b.getBoundingClientRect(); var el = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2); return el ? (el.id || el.className || el.tagName) : null; })() })');
+    // 小条态下 btnPass / btnCollapse 已收进「⋯」，命中检测改测 ⋯
+    results.leadSeq.fromPassthroughCollapse = await js('({ btnPass: document.getElementById("btnPass").textContent, btnCollapse: document.getElementById("btnCollapse").textContent, bodyClass: document.body.className, hit: (function(){ var b = document.getElementById("btnMore"); if (!b) return null; var r = b.getBoundingClientRect(); var el = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2); return el ? (el.id || el.className || el.tagName) : null; })() })');
     results.leadSeq.fromPassthroughCollapse.realHeight = win.getBounds().height;
     results.a11 = await capture('smoke-11-collapsed-from-passthrough.png');
-    await js('document.getElementById("btnCollapse").click()');
-    await wait(450);
+    // 小条态展开：走「⋯ → 展开面板」
+    await js('document.getElementById("btnMore").click()');
+    await wait(400);
+    await js('document.querySelector(\'#moreMenu .more-item[data-act="expand"]\').click()');
+    await wait(500);
     results.leadSeq.fromPassthroughExpand = await js('({ btnPass: document.getElementById("btnPass").textContent, btnCollapse: document.getElementById("btnCollapse").textContent, cells: document.querySelectorAll(".cell").length })');
     results.leadSeq.fromPassthroughExpand.realHeight = win.getBounds().height;
 
@@ -630,7 +709,56 @@ async function run(win, app, ROOT) {
     results.mods = {};
     await js('window.api.setCollapsed(false)');
     await wait(500);
+    // 复位两个加成到 0：自检不能依赖上一次运行残留的 state.json
+    await js('(function(){'
+      + ' var pairs = [["atk1","atkPct"],["atk1","powerAdd"],["atk2","atkPct"],["atk2","powerAdd"]];'
+      + ' pairs.forEach(function(p){'
+      + '   var i = document.querySelector(".mod-input[data-slot=" + p[0] + "][data-mod=" + p[1] + "]");'
+      + '   if (i) { i.value = "0"; i.dispatchEvent(new Event("change")); }'
+      + ' });'
+      + ' return true; })()');
+    await wait(600);
     results.mods.baseline = await js('Array.prototype.slice.call(document.querySelectorAll(".cell-main")).map(function(e){ return e.textContent; })');
+
+    // 威力加成是「数值」加成：点一次 + 应恰好 +20（不是 +20%），且控件不再带 % 单位
+    const powerBase = await js('({ values: window.__xyDebug.values, pct: Array.prototype.slice.call(document.querySelectorAll(".cell-pct")).map(function(e){ return e.textContent; }) })');
+    await js('(function(){ var b = document.querySelector(".mod-btn[data-slot=atk1][data-mod=powerAdd][data-dir=\'1\']"); b.click(); return true; })()');
+    await wait(600);
+    results.mods.powerAddStep = await js('(function(){'
+      + ' var i = document.querySelector(".mod-input[data-slot=atk1][data-mod=powerAdd]");'
+      + ' var item = i ? i.closest(".mod-item") : null;'
+      + ' var hintEl = document.querySelector(".cfg-hint[data-slot=atk1]");'
+      + ' return {'
+      + '   value: i ? i.value : null,'
+      + '   domKey: (item && item.querySelector(".mod-input")) ? item.querySelector(".mod-input").getAttribute("data-mod") : null,'
+      + '   hasPercentUnit: item ? !!item.querySelector(".mod-unit") : null,'
+      + '   hint: hintEl ? hintEl.textContent : null,'
+      + '   cells: Array.prototype.slice.call(document.querySelectorAll(".cell-main")).map(function(e){ return e.textContent; })'
+      + ' }; })()');
+    // 层数是整数刻度，+20 威力（默认技能威力 200，仅 +10%）常常跨不了层；
+    // 真正该断言的是「伤害确实变了」→ 比较 0 层伤害占比
+    results.mods.powerAddPctChanged = JSON.stringify(powerBase.pct) !== JSON.stringify(await js('Array.prototype.slice.call(document.querySelectorAll(".cell-pct")).map(function(e){ return e.textContent; })'));
+    results.mods.powerAddLayersSame = JSON.stringify(powerBase.values) === JSON.stringify(await js('window.__xyDebug.values'));
+    // 再点一次 → 40，确认是叠加而不是取整
+    await js('(function(){ var b = document.querySelector(".mod-btn[data-slot=atk1][data-mod=powerAdd][data-dir=\'1\']"); b.click(); return true; })()');
+    await wait(500);
+    results.mods.powerAddStep2 = await js('document.querySelector(".mod-input[data-slot=atk1][data-mod=powerAdd]").value');
+    // 加满到 +100 威力（威力 200 → 300，+50%），层数应当明显下降
+    await js('(function(){ var i = document.querySelector(".mod-input[data-slot=atk1][data-mod=powerAdd]"); i.value = "100"; i.dispatchEvent(new Event("change")); return true; })()');
+    await wait(600);
+    results.mods.powerAdd100 = {
+      cells: await js('Array.prototype.slice.call(document.querySelectorAll(".cell-main")).map(function(e){ return e.textContent; })'),
+      pct: await js('Array.prototype.slice.call(document.querySelectorAll(".cell-pct")).map(function(e){ return e.textContent; })'),
+      hint: await js('(document.querySelector(".cfg-hint[data-slot=atk1]")||{}).textContent || ""')
+    };
+    // 层数应当真的下降（威力 200 → 300）
+    results.mods.powerAdd100Dropped = (function(a, b){ return Array.isArray(a) && Array.isArray(b) && b.length >= 3 && a.slice(0,3).join() !== b.slice(0,3).join(); })(results.mods.baseline, results.mods.powerAdd100.cells);
+    // 复位，避免 +100 威力污染后面的明细 / 小条断言
+    await js('(function(){ var i = document.querySelector(".mod-input[data-slot=atk1][data-mod=powerAdd]"); if (i) { i.value = "0"; i.dispatchEvent(new Event("change")); } return true; })()');
+    await wait(500);
+    // 复位
+    await js('(function(){ var i = document.querySelector(".mod-input[data-slot=atk1][data-mod=powerAdd]"); if (i) { i.value = "0"; i.dispatchEvent(new Event("change")); } return true; })()');
+    await wait(500);
 
     // 攻① 攻击 +50%
     await js('document.querySelector(".mod-btn[data-slot=atk1][data-mod=atkPct][data-dir=\'1\']").click()');
@@ -642,12 +770,12 @@ async function run(win, app, ROOT) {
       atk2Hint: await js('(document.querySelector(".cfg-hint[data-slot=atk2]")||{}).textContent || ""')
     };
 
-    // 攻② 威力 +100%（两次 +）
-    await js('(function(){ var b = document.querySelector(".mod-btn[data-slot=atk2][data-mod=powerPct][data-dir=\'1\']"); b.click(); b.click(); return true; })()');
+    // 攻② 威力加成点两次 +（每档 20 威力 → 共 +40）
+    await js('(function(){ var b = document.querySelector(".mod-btn[data-slot=atk2][data-mod=powerAdd][data-dir=\'1\']"); b.click(); b.click(); return true; })()');
     await wait(600);
-    results.mods.atk2Power100 = {
+    results.mods.atk2PowerAdd40 = {
       cells: await js('Array.prototype.slice.call(document.querySelectorAll(".cell-main")).map(function(e){ return e.textContent; })'),
-      value: await js('document.querySelector(".mod-input[data-slot=atk2][data-mod=powerPct]").value'),
+      value: await js('document.querySelector(".mod-input[data-slot=atk2][data-mod=powerAdd]").value'),
       hint: await js('(document.querySelector(".cfg-hint[data-slot=atk2]")||{}).textContent || ""')
     };
 
@@ -660,7 +788,7 @@ async function run(win, app, ROOT) {
       minusDisabled: await js('document.querySelector(".mod-btn[data-slot=atk1][data-mod=atkPct][data-dir=\'-1\']").disabled')
     };
 
-    // 手填 37
+    // 手填 37（攻击加成，百分比口径）
     await js('(function(){ var i = document.querySelector(".mod-input[data-slot=atk1][data-mod=atkPct]"); i.value = "37"; i.dispatchEvent(new Event("change")); return true; })()');
     await wait(700);
     results.mods.manual37 = {
@@ -694,7 +822,7 @@ async function run(win, app, ROOT) {
     // 复位
     await js('window.api.setCollapsed(false)');
     await wait(500);
-    await js('(function(){ var a = document.querySelector(".mod-input[data-slot=atk1][data-mod=atkPct]"); a.value="0"; a.dispatchEvent(new Event("change")); var b = document.querySelector(".mod-input[data-slot=atk2][data-mod=powerPct]"); b.value="0"; b.dispatchEvent(new Event("change")); return true; })()');
+    await js('(function(){ var a = document.querySelector(".mod-input[data-slot=atk1][data-mod=atkPct]"); a.value="0"; a.dispatchEvent(new Event("change")); var b = document.querySelector(".mod-input[data-slot=atk2][data-mod=powerAdd]"); b.value="0"; b.dispatchEvent(new Event("change")); return true; })()');
     await wait(600);
     results.mods.afterReset = await js('Array.prototype.slice.call(document.querySelectorAll(".cell-main")).map(function(e){ return e.textContent; })');
 
@@ -716,7 +844,7 @@ async function run(win, app, ROOT) {
 
     // 信息完整性：每张卡片该有的控件都在
     results.compact.info = {
-      atk1: await js('(function(){ var c = document.querySelector(".slot-card[data-slot=atk1]"); return { name: (c.querySelector(".picker-btn .name")||{}).textContent, skill: !!c.querySelector(".skill-select").value, nature: !!c.querySelector(".cfg-nature").value, ivs: !!c.querySelector(".cfg-ivs").value, atkBtn: !!c.querySelector("[data-mod=atkPct][data-dir=\'1\']"), powerBtn: !!c.querySelector("[data-mod=powerPct][data-dir=\'1\']"), hint: (c.querySelector(".cfg-hint")||{}).textContent }; })()'),
+      atk1: await js('(function(){ var c = document.querySelector(".slot-card[data-slot=atk1]"); return { name: (c.querySelector(".picker-btn .name")||{}).textContent, skill: !!c.querySelector(".skill-select").value, nature: !!c.querySelector(".cfg-nature").value, ivs: !!c.querySelector(".cfg-ivs").value, atkBtn: !!c.querySelector("[data-mod=atkPct][data-dir=\'1\']"), powerBtn: !!c.querySelector("[data-mod=powerAdd][data-dir=\'1\']"), hint: (c.querySelector(".cfg-hint")||{}).textContent }; })()'),
       def: await js('(function(){ var c = document.querySelector(".slot-card-def"); return { name: (c.querySelector(".picker-btn .name")||{}).textContent, skill: (c.querySelector(".def-skill")||{}).value, height: Math.round(c.getBoundingClientRect().height) }; })()'),
       cells: await js('Array.prototype.slice.call(document.querySelectorAll(".cell")).map(function(c){ return { main: (c.querySelector(".cell-main")||{}).textContent, pct: (c.querySelector(".cell-pct")||{}).textContent, j: (c.querySelector(".cell-j")||{}).textContent }; })'),
       rowCfg: await js('Array.prototype.slice.call(document.querySelectorAll(".grid-row .row-cfg")).map(function(e){ return e.textContent; })'),
@@ -968,7 +1096,7 @@ async function run(win, app, ROOT) {
       const b = win.getBounds();
       const img = await win.webContents.capturePage({ x: Math.max(0, b.width - 140), y: Math.max(0, b.height - 70), width: 140, height: 70 });
       const zoomed = img.resize({ width: 280, height: 140, quality: 'best' });
-      fs.writeFileSync(path.join(ROOT, '_intermediates', 'smoke-ghost-corner-2x.png'), zoomed.toPNG());
+      fs.writeFileSync(path.join(runner.outDir, 'smoke-ghost-corner-2x.png'), zoomed.toPNG());
     }
     // 小条态行剖面：每行不透明像素比例 + 首尾行平均色（定位残影位置与颜色）
     {
@@ -992,7 +1120,7 @@ async function run(win, app, ROOT) {
     results.ghost.worstRight = Math.max.apply(null, results.ghost.samples.map(x => x.rightBand));
     results.ghost.worstBottom = Math.max.apply(null, results.ghost.samples.map(x => x.bottomBand));
 
-    // ⑦ 性能基准：清缓存后连续跑 3 次「2 攻方 × 3 档 × 16 组 = 96 次求解」全量
+    // ⑦ 性能基准：清缓存后连续跑 3 次「3 攻方 × 3 档 × 20 组 = 180 次求解」全量
     results.bench = await js('(function(){ var D = window.RocoDomain; var rows = ["atk1","atk2"]; var out = []; var note = "";' +
       ' for (var run = 0; run < 3; run++) { D.clearCache(); var t0 = performance.now();' +
       ' for (var r = 0; r < rows.length; r++) { for (var t = 0; t < D.DEFENDER_TIERS.length; t++) {' +
@@ -1004,6 +1132,8 @@ async function run(win, app, ROOT) {
 
   } catch (e) {
     results.error = String((e && e.message) || e);
+    results.errorStack = String((e && e.stack) || '');
+    results.errorAt = results.lastStep || null;
   }
   console.log('[smoke] ' + JSON.stringify(results));
   app.exit(results.error ? 1 : 0);

@@ -324,16 +324,17 @@ section('[V4] 组合空间');
 // ===========================================================================
 // V5 性能
 // ===========================================================================
-section('[V5] 性能：2 攻方 × 3 档 × 16 组');
+section('[V5] 性能：3 攻方 × 3 档 × 20 组');
 {
   const ATK1 = (others.common_attackers || [])[0] || Object.keys(sprites)[0];
   const ATK2 = (others.common_attackers || [])[1] || Object.keys(sprites)[1];
+  const ATK3 = (others.common_attackers || [])[2] || Object.keys(sprites)[2];
   const DEF = '尖嘴狐仙'; // 可斩杀目标：能压到"估计 + 验证"的热路径
   const build = () => {
     domain.clearCache();
     const t0 = performance.now();
     let total = 0;
-    for (const a of [ATK1, ATK2]) {
+    for (const a of [ATK1, ATK2, ATK3]) {
       for (const tier of domain.DEFENDER_TIERS) {
         const scene = domain.buildScene({ attackerId: a, defenderId: DEF, tierKey: tier.key });
         const res = domain.evaluateAll(scene, 10);
@@ -345,21 +346,21 @@ section('[V5] 性能：2 攻方 × 3 档 × 16 组');
   build(); // 预热 JIT
   const cold = build(); // 清缓存后计时（真实冷启动路径）
   const warm = build();
-  ok(cold.ms < 100, '冷启动 6 格全量计算超过 100ms：' + cold.ms.toFixed(1) + 'ms');
-  console.log('  攻方 ' + ATK1 + ' / ' + ATK2 + ' → 靶子 ' + DEF);
+  ok(cold.ms < 100, '冷启动 9 格全量计算超过 100ms：' + cold.ms.toFixed(1) + 'ms');
+  console.log('  攻方 ' + ATK1 + ' / ' + ATK2 + ' / ' + ATK3 + ' → 靶子 ' + DEF);
   console.log('  冷启动 ' + cold.ms.toFixed(1) + 'ms，热缓存 ' + warm.ms.toFixed(1) + 'ms，可斩组合数 ' + cold.total);
 
   // 20 组口径：全量应远小于 600 组
   {
     const t16 = performance.now();
     domain.clearCache();
-    for (const a of [ATK1, ATK2]) for (const tier of domain.DEFENDER_TIERS) {
+    for (const a of [ATK1, ATK2, ATK3]) for (const tier of domain.DEFENDER_TIERS) {
       const sc = domain.buildScene({ attackerId: a, defenderId: DEF, tierKey: tier.key });
       if (sc) domain.evaluateAll(sc, 10);
     }
     const ms16 = performance.now() - t16;
-    ok(ms16 < 20, '20 组全量（2×3）超过 20ms：' + ms16.toFixed(1) + 'ms');
-    console.log('  20 组参考（2 攻方 × 3 档 × 20 组 = 120 次求解）' + ms16.toFixed(1) + 'ms');
+    ok(ms16 < 20, '20 组全量（3×3）超过 20ms：' + ms16.toFixed(1) + 'ms');
+    console.log('  20 组参考（3 攻方 × 3 档 × 20 组 = 180 次求解）' + ms16.toFixed(1) + 'ms');
   }
 
   // 单格结果 = 按给定配置算（不再挑最优）
@@ -403,10 +404,10 @@ section('[V5] 性能：2 攻方 × 3 档 × 16 组');
     console.log('  单格按配置求解 = 直接求解；20 组参考最小值 ' + (minL === Infinity ? '无' : minL) + ' 层');
   }
 
-  // 攻方加成：0 时与基线一致；+X% 时伤害按公式增长；夹紧与缓存隔离
+  // 攻方加成：0 时与基线一致；攻击按百分比、威力按点数增长；夹紧与缓存隔离
   {
     const mkScene = (a, p) => domain.buildScene({
-      attackerId: ATK1, defenderId: DEF, tierKey: 't1', atkPct: a, powerPct: p,
+      attackerId: ATK1, defenderId: DEF, tierKey: 't1', atkPct: a, powerAdd: p,
     });
     const auto = { natureKey: 'auto', ivsKey: 'auto' };
     const base = domain.cellResult(mkScene(undefined, undefined), 10, auto);
@@ -418,17 +419,26 @@ section('[V5] 性能：2 攻方 × 3 档 × 16 组');
     const r50 = a50.dmg0 / base.dmg0;
     ok(Math.abs(r50 - 1.5) < 0.02, '攻击 +50% 伤害未按 ×1.5 增长：' + r50.toFixed(3));
 
-    const p100 = domain.cellResult(mkScene(0, 100), 10, auto);
+    // 威力加成是「数值」：+威力 P 后伤害应变为 (power + P) / power 倍
+    const basePower = (mkScene(0, 0).attackSkill && mkScene(0, 0).attackSkill.power) || 0;
+    const pAdd = 100;
+    const p100 = domain.cellResult(mkScene(0, pAdd), 10, auto);
     const rp = p100.dmg0 / base.dmg0;
-    ok(Math.abs(rp - 2) < 0.02, '威力 +100% 伤害未按 ×2 增长：' + rp.toFixed(3));
+    const expectRp = (basePower + pAdd) / basePower;
+    ok(Math.abs(rp - expectRp) < 0.02,
+      '威力 +' + pAdd + ' 点伤害未按 ×' + expectRp.toFixed(3) + ' 增长：' + rp.toFixed(3) + '（基础威力 ' + basePower + '）');
 
     const a37 = domain.cellResult(mkScene(37, 0), 10, auto);
     ok(Math.abs(a37.dmg0 / base.dmg0 - 1.37) < 0.02, '攻击 +37% 伤害未按 ×1.37 增长');
 
     ok(mkScene(0, 0).key !== mkScene(50, 0).key, '加成未进入场景缓存键');
     const big = mkScene(999, -999);
-    ok(big.atkPct === 300 && big.powerPct === -100, '加成未夹紧到 [-100,300]');
-    console.log('  加成 0 与基线一致；+50% → ×' + r50.toFixed(3) + '，威力+100% → ×' + rp.toFixed(3));
+    ok(big.atkPct === 300 && big.powerAdd === -100, '加成未夹紧到 [-100,300]');
+    // 威力加成是数值：负到把基础威力压穿时，内核按 max(0, …) 兜底，不能出负威力
+    const neg = domain.cellResult(mkScene(0, -999), 10, auto);
+    ok(neg && neg.dmg0 >= 0, '威力加成压穿后出现了负伤害：' + (neg && neg.dmg0));
+    console.log('  加成 0 与基线一致；攻击+50% → ×' + r50.toFixed(3) +
+      '，威力+' + pAdd + ' 点 → ×' + rp.toFixed(3) + '（基础威力 ' + basePower + '）');
   }
 
   // 交互级：改技能后单格重算（展开明细/手动配置时走这条路径）

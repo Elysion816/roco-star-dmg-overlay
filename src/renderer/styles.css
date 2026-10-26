@@ -147,7 +147,7 @@ button { cursor: pointer; border: none; background: none; padding: 0; }
   background: var(--inset-bg);
   font-size: 11px;
   color: var(--text);
-  max-width: 120px;
+  max-width: 132px;
   min-width: 0;
   transition: background 0.12s, border-color 0.12s;
 }
@@ -155,6 +155,46 @@ button { cursor: pointer; border: none; background: none; padding: 0; }
 .mini-target .mt-emoji { flex: 0 0 auto; font-size: 11px; }
 .mini-target .mt-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-target .mt-caret { flex: 0 0 auto; color: var(--text-faint); font-size: 9px; }
+
+/* 小条右侧的接管/穿透状态指示：只有一个圆点，点击可切换。
+   不带文字/边框/底色 —— 小条空间要全留给三个攻方与守方名。 */
+.mini-status {
+  -webkit-app-region: no-drag;
+  flex: 0 0 auto;
+  display: none;              /* 展开态不显示（那边有完整的「穿透/接管中」按钮） */
+  width: 14px;
+  height: 22px;               /* 与搜索框同高，圆点在其中垂直居中 */
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+body.collapsed .mini-status { display: inline-flex; }
+/* 圆点本体：用 ::before 画，按钮只是点击热区 */
+.mini-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  border: 1.5px solid transparent;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+/* 接管中：金色实心 + 微光（与标题栏高亮同色系） */
+.mini-status.is-takeover::before {
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 7px rgba(255, 204, 102, 0.9);
+}
+/* 穿透：红色空心，一眼看出"鼠标不在我这儿" */
+.mini-status.is-passthrough::before {
+  background: transparent;
+  border-color: var(--danger);
+  box-shadow: none;
+}
+.mini-status:hover::before { transform: scale(1.15); }
 
 /* 小条内联搜索框 */
 .mini-search {
@@ -194,6 +234,57 @@ button { cursor: pointer; border: none; background: none; padding: 0; }
 .wbtn.is-on { color: #0d1220; background: linear-gradient(180deg, #ffe0a0, var(--gold)); border-color: var(--gold-dim); font-weight: 700; }
 .wbtn-danger:hover { background: rgba(255, 90, 90, 0.22); color: #ffd9d9; border-color: rgba(255, 90, 90, 0.5); }
 
+/* 「⋯」只在小条态出现；展开态四个按钮平铺 */
+.wbtn-more { display: none; font-size: 14px; letter-spacing: 1px; padding: 0 6px; }
+/* 小条态：右侧四个按钮全部收进「⋯」下拉，标题栏只留一个按钮 */
+body.collapsed #btnTip,
+body.collapsed #btnPass,
+body.collapsed #btnCollapse,
+body.collapsed #btnClose { display: none; }
+body.collapsed .wbtn-more { display: inline-flex; align-items: center; justify-content: center; }
+
+/* 小条态的下拉菜单 */
+.more-menu {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 148px;
+  padding: 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: rgba(9, 13, 21, 0.99);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6);
+  -webkit-app-region: no-drag;
+}
+.more-menu.is-hidden { display: none; }
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--text);
+  text-align: left;
+  white-space: nowrap;
+}
+.more-item .more-ico {
+  flex: 0 0 14px;
+  width: 14px;
+  text-align: center;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.more-item:hover .more-ico { color: var(--text-dim); }
+.more-item.is-danger:hover .more-ico { color: #ffd9d9; }
+.more-item .more-txt { flex: 1 1 auto; }
+.more-item:hover { background: var(--inset-bg-hover); }
+.more-item.is-danger:hover { background: rgba(255, 90, 90, 0.22); color: #ffd9d9; }
+
 /* ---------------------------------------------------------------- 主内容 */
 #content {
   flex: 1 1 auto;
@@ -210,33 +301,65 @@ button { cursor: pointer; border: none; background: none; padding: 0; }
 .picker-list::-webkit-scrollbar-thumb { background: rgba(126, 160, 255, 0.25); border-radius: 8px; }
 
 /* 提示条 */
+/* 快捷键面板（原「使用提示」条改造） */
 .tip {
-  height: 24px;
-  font-size: 10.5px;
-  padding: 0 8px;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-dim);
-  background: rgba(255, 204, 102, 0.08);
-  border: 1px solid rgba(255, 204, 102, 0.22);
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 9px 7px;
+  color: var(--text);
+  background: rgba(10, 14, 24, 0.82);          /* 深色底板：键帽与文字都有足够对比 */
+  border: 1px solid rgba(255, 204, 102, 0.34);
   border-radius: 8px;
-  padding: 4px 8px;
+  flex: 0 0 auto;
 }
 .tip.is-hidden { display: none; }
-.tip-icon {
-  width: 13px; height: 13px; flex: 0 0 13px;
-  border-radius: 50%;
-  background: rgba(255, 204, 102, 0.9);
-  color: #1a1206;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 13px;
-  text-align: center;
+.tip-head { display: flex; align-items: center; gap: 6px; }
+.tip-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.4px;
 }
-.tip-close { margin-left: auto; color: var(--text-faint); font-size: 11px; padding: 0 2px; }
+.tip-close { margin-left: auto; color: var(--text-faint); font-size: 11px; padding: 0 2px; line-height: 1; }
 .tip-close:hover { color: var(--text); }
+
+/* 快捷键列表 */
+.sc-list { display: flex; flex-direction: column; gap: 3px; }
+.sc-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  color: rgba(232, 238, 255, 0.92);
+  min-width: 0;
+}
+.sc-row span {
+  margin-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 键帽 */
+.sc-row kbd {
+  flex: 0 0 auto;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff3d6;                          /* 暖白文字 */
+  background: rgba(255, 255, 255, 0.10);   /* 深底上抬一档的键帽 */
+  border: 1px solid rgba(255, 204, 102, 0.52);
+  border-bottom-width: 2px;
+  border-bottom-color: rgba(255, 204, 102, 0.68);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
 
 /* ---------------------------------------------------------------- 卡片 */
 .card {
@@ -603,6 +726,9 @@ button { cursor: pointer; border: none; background: none; padding: 0; }
 .mcell.m4 { background: rgba(255, 154, 82, 0.42); }
 .mcell.m5 { background: rgba(255, 90, 90, 0.36); color: #ffd9d9; }
 .mcell.is-best { outline: 1px solid var(--gold); outline-offset: 1px; }
+/* 当前生效的那套配置：青色描边（与分组清单的 .crow.is-sel 同色） */
+.mcell.is-sel { outline: 1px solid var(--cyan); outline-offset: -1px; }
+/* 点击选中的格：白色描边，优先级高于 is-sel */
 .mcell.is-pick { outline: 2px solid #fff; outline-offset: -1px; }
 
 .detail-foot { flex: 0 0 auto; min-height: 16px; font-size: 10.5px; color: var(--text-faint); font-family: var(--mono); }
@@ -833,7 +959,7 @@ body.passthrough #btnPass { color: var(--text-faint); }
 .slot-card-def .picker-btn { flex: 0 0 auto; }
 .slot-card-def .def-skill { flex: 1 1 auto; min-width: 120px; max-width: 300px; height: 22px; font-size: 10.5px; }
 
-/* 6 格：行头两行 + 格子精简 */
+/* 结果矩阵：行头两行 + 格子精简（3 攻方 × 3 档 = 9 格） */
 .grid-head, .grid-row { grid-template-columns: 92px repeat(3, 1fr); }
 .row-head {
   display: flex;
@@ -863,7 +989,11 @@ body.passthrough #btnPass { color: var(--text-faint); }
 
 /* ⓘ 提示按钮 */
 .wbtn-tip { color: var(--text-faint); }
-.wbtn-tip.is-on { color: var(--gold); }
+.wbtn-tip.is-on {
+  color: var(--gold);
+  background: rgba(255, 204, 102, 0.14);
+  border-color: rgba(255, 204, 102, 0.38);
+}
 
 /* 明细面板同款收紧 */
 .detail { padding: 8px 10px; }
@@ -933,14 +1063,18 @@ html, body {
 ::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
 
 /* 小条 620 宽时也要把窗口按钮留住：搜索框/靶子按钮让位，摘要名字可缩 */
-body.collapsed .mini-search { min-width: 44px; max-width: 170px; }
-body.collapsed .mini-target { max-width: 96px; }
 body.collapsed .mini-target .mt-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-body.collapsed .mini-item b.mini-name { max-width: 52px; }
-body.collapsed .mini-sum { gap: 7px; }
 body.collapsed #titlebar { gap: 6px; }
 
-/* 小条：摘要优先完整显示（不裁数字），搜索框让位 */
+/* 小条：摘要优先完整显示（不裁数字），靶子/搜索框让位给第三个攻方 */
 body.collapsed .mini-sum { flex: 0 0 auto; }
-body.collapsed .mini-search { flex: 1 1 40px; min-width: 40px; max-width: 170px; }
-body.collapsed .mini-target { flex: 0 0 auto; }
+/* 三攻方后搜索框必须收窄：原来 170px 会把第三个攻方挤出可视区 */
+body.collapsed .mini-search { flex: 0 1 92px; min-width: 56px; max-width: 92px; }
+/* 守方名字适当放宽：620 宽下还有余量，78px 连「尖嘴狐仙」都截断 */
+body.collapsed .mini-target { flex: 0 0 auto; max-width: 112px; }
+/* 三攻方摘要：名字更短、间距更紧、数字略小 */
+body.collapsed .mini-sum { gap: 6px; }
+body.collapsed .mini-item { gap: 2px; }
+body.collapsed .mini-item b.mini-name { max-width: 44px; font-size: 10px; }
+body.collapsed .mini-item i { font-size: 12px; }
+body.collapsed .mini-sep { display: none; }
