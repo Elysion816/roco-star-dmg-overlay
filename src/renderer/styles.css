@@ -147,13 +147,13 @@ button { cursor: pointer; border: none; background: none; padding: 0; }
   background: var(--inset-bg);
   font-size: 11px;
   color: var(--text);
-  max-width: 132px;
+  max-width: 122px;
   min-width: 0;
   transition: background 0.12s, border-color 0.12s;
 }
 .mini-target:hover { background: var(--inset-bg-hover); border-color: var(--line-strong); }
 .mini-target .mt-emoji { flex: 0 0 auto; font-size: 11px; }
-.mini-target .mt-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-target .mt-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-target .mt-caret { flex: 0 0 auto; color: var(--text-faint); font-size: 9px; }
 
 /* 小条右侧的接管/穿透状态指示：只有一个圆点，点击可切换。
@@ -200,7 +200,7 @@ body.collapsed .mini-status { display: inline-flex; }
 .mini-search {
   -webkit-app-region: no-drag;
   flex: 1 1 auto;
-  max-width: 220px;
+  max-width: 200px;
   min-width: 70px;
   height: 22px;
   padding: 0 8px;
@@ -1066,15 +1066,114 @@ html, body {
 body.collapsed .mini-target .mt-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 body.collapsed #titlebar { gap: 6px; }
 
-/* 小条：摘要优先完整显示（不裁数字），靶子/搜索框让位给第三个攻方 */
-body.collapsed .mini-sum { flex: 0 0 auto; }
-/* 三攻方后搜索框必须收窄：原来 170px 会把第三个攻方挤出可视区 */
-body.collapsed .mini-search { flex: 0 1 92px; min-width: 56px; max-width: 92px; }
-/* 守方名字适当放宽：620 宽下还有余量，78px 连「尖嘴狐仙」都截断 */
-body.collapsed .mini-target { flex: 0 0 auto; max-width: 112px; }
-/* 三攻方摘要：名字更短、间距更紧、数字略小 */
-body.collapsed .mini-sum { gap: 6px; }
-body.collapsed .mini-item { gap: 2px; }
-body.collapsed .mini-item b.mini-name { max-width: 44px; font-size: 10px; }
-body.collapsed .mini-item i { font-size: 12px; }
+/* 小条：摘要整体可压缩，但每个攻方内部不许挤压（否则名字数字会叠在一起） */
+body.collapsed .mini-sum {
+  /* 按内容宽度排，但设上限：全两位数时摘要会涨到 400px，
+     不封顶就会把守方名字挤成 0 宽。留 38% 给右侧控件。 */
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 76%;
+  gap: 3px;
+  overflow: hidden;
+}
+body.collapsed .mini-item {
+  /* 数字之间只用 2px 间隙，斜杠本身也调小（见下面的 > b 规则），
+     省出来的宽度全给右侧的守方与搜索框。 */
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+/* 分隔符「/」：小条里不需要 12.5px 那么粗 */
+body.collapsed .mini-item > b {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.55;
+  margin: 0 1px;
+}
 body.collapsed .mini-sep { display: none; }
+
+/* -------------------------------------------------------------------------
+   小条字号：整体比展开态放大一档，让 38px 的条被文字撑满（原来 10~12px 显得空）
+   放大后宽度会紧张，所以名字可截断、搜索框可压缩，数字（最重要）不裁。
+   ------------------------------------------------------------------------- */
+body.collapsed .mini-item { font-size: 12.5px; }
+body.collapsed .mini-item b.mini-name {
+  max-width: 50px;     /* 「祭礼巨像」这类 4 字名正好放得下；再长就省略 */
+  font-size: 11.5px;
+  color: rgba(230, 238, 255, 0.74);
+  flex: 0 0 auto;      /* 只按 max-width 截断，不参与 flex 压缩 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.collapsed .mini-item i { font-size: 15px; flex: 0 0 auto; }
+body.collapsed .mini-item > b { flex: 0 0 auto; }   /* 「/」分隔符 */
+body.collapsed .mini-item i.lv-none { font-size: 13px; }
+body.collapsed .mini-boost { font-size: 10px; }
+
+/* 靶子按钮 / 搜索框：高度 22 → 26，字号 11 → 12.5 */
+body.collapsed .mini-target {
+  /* flex-basis 必须为 0：用 auto 时初始宽=内容宽，而内容（名字）已被压扁，
+     形成循环依赖 → 按钮永远长不大。 */
+  flex: 7 1 0;           /* 守方名字更长，权重 7:4 */
+  min-width: 74px;       /* 保底：图标 + 3 字 + 箭头 */
+  max-width: 200px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12.5px;
+  gap: 5px;
+}
+body.collapsed .mini-target .mt-emoji { font-size: 12.5px; }
+body.collapsed .mini-target .mt-caret { font-size: 10px; }
+
+body.collapsed .mini-search {
+  flex: 4 1 0;           /* 守方 7 : 搜索框 4 分配剩余空间 */
+  min-width: 52px;
+  max-width: 200px;
+  height: 26px;
+  font-size: 12.5px;
+  padding: 0 8px;
+}
+
+/* 状态圆点：跟着控件一起长高，圆点 8 → 9px */
+body.collapsed .mini-status { width: 16px; height: 26px; }
+body.collapsed .mini-status::before { width: 9px; height: 9px; }
+
+/* ⋯ 按钮：14 → 16px，高度 22 → 26 */
+body.collapsed .wbtn-more {
+  font-size: 16px;
+  height: 26px;
+  padding: 0 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* -------------------------------------------------------------------------
+   窄窗（窗口可缩到 460）降半档：保证三个攻方仍然完整显示。
+   只在真的挤不下时才触发，620 宽下仍是上面那套大字号。
+   ------------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  body.collapsed .mini-item { font-size: 11.5px; gap: 3px; }
+  body.collapsed .mini-item b.mini-name { max-width: 46px; font-size: 10.5px; }
+  body.collapsed .mini-item i { font-size: 13.5px; }
+  body.collapsed .mini-item i.lv-none { font-size: 12px; }
+  body.collapsed .mini-sum { gap: 4px; max-width: 64%; }
+  body.collapsed .mini-target { flex: 7 1 0; max-width: 180px; min-width: 52px; height: 24px; font-size: 11.5px; padding: 0 5px; gap: 3px; }
+  body.collapsed .mini-target .mt-emoji { font-size: 11px; }
+  body.collapsed .mini-target .mt-caret { font-size: 8px; }
+  body.collapsed .mini-search { flex: 4 1 0; max-width: 180px; min-width: 48px; height: 24px; font-size: 11.5px; padding: 0 6px; }
+  body.collapsed .mini-status { width: 15px; height: 24px; }
+  body.collapsed .mini-status::before { width: 8px; height: 8px; }
+  body.collapsed .wbtn-more { height: 24px; font-size: 15px; }
+}
+
+/* 再窄一档（<520）：字再小半档，仍然优先保证三攻方数字完整 */
+@media (max-width: 520px) {
+  body.collapsed .mini-sum { gap: 5px; }
+  body.collapsed .mini-item { font-size: 10.5px; gap: 2px; }
+  body.collapsed .mini-item b.mini-name { max-width: 40px; font-size: 9.5px; }
+  body.collapsed .mini-item i { font-size: 12.5px; }
+  body.collapsed .mini-target { flex: 7 1 0; max-width: 160px; min-width: 48px; }
+  body.collapsed .mini-search { flex: 4 1 0; max-width: 160px; min-width: 44px; }
+  body.collapsed .mini-sum { gap: 4px; }
+}

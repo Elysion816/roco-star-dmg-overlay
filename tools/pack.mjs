@@ -21,7 +21,21 @@ const DIST = path.join(ROOT, 'dist');
 const APP_NAME = '星陨斩杀线';
 const OUT_DIR_NAME = APP_NAME + '-win32-x64';
 
-const IGNORE = [/^\/_intermediates/, /^\/work/, /^\/dist/, /^\/\.git/, /^\/tests/, /^\/node_modules\//];
+/**
+ * 打包白名单：只有这几项会进 resources/app。
+ *
+ * 为什么不用黑名单：根目录会不断长出新东西（介绍片 mp4/srt、nul、各种截图），
+ * 黑名单永远追不上，结果就是每个新文件都悄悄被打进 100MB 的绿色包里。
+ * 白名单的代价是新增必需文件时要记得加一行 —— 比"包里混进 8MB 视频"好排查得多。
+ */
+const INCLUDE = [
+  /^\/package\.json$/,
+  /^\/README\.md$/,
+  /^\/LICENSE$/,
+  /^\/start-debug\.bat$/,
+  /^\/src\//,
+  /^\/tools\//,
+];
 
 function rmrf(p) { fs.rmSync(p, { recursive: true, force: true }); }
 const mb = b => (b / 1048576).toFixed(1) + ' MB';
@@ -102,7 +116,8 @@ async function packagerPack() {
     asar: false,
     prune: true,
     icon: path.join(ROOT, 'src', 'assets', 'icon.ico'),
-    ignore: IGNORE,
+    // @electron/packager 的 ignore 是「匹配则排除」，所以传白名单的反集
+    ignore: [(p) => !INCLUDE.some(re => re.test(p))],
     appVersion: readPkg().version,
     // 命中本机缓存 → 打包不联网
     ...(zip ? { electronZipDir: path.dirname(zip) } : {}),
@@ -120,10 +135,13 @@ async function packagerPack() {
 function sanitizePack(outDir) {
   const appDir = path.join(outDir, 'resources', 'app');
   if (!fs.existsSync(appDir)) return [];
+  const KEEP = new Set(['package.json', 'README.md', 'LICENSE', 'start-debug.bat', 'src', 'tools', 'node_modules']);
   const removed = [];
-  for (const name of ['_intermediates', 'work', 'tests', '.git', 'dist']) {
+  for (const name of fs.readdirSync(appDir)) {
+    if (KEEP.has(name)) continue;
     const p = path.join(appDir, name);
-    if (fs.existsSync(p)) { rmrf(p); removed.push(name); }
+    rmrf(p);
+    removed.push(name);
   }
   return removed;
 }
