@@ -1,7 +1,7 @@
 {
   "name": "xingyun-killline",
   "productName": "星陨斩杀线",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "《洛克王国：世界》星陨玩法斩杀线置顶浮窗（Electron 绿色版）",
   "main": "src/main/main.js",
   "private": false,

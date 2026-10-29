@@ -39,8 +39,8 @@
 打开 **[Releases](https://github.com/Elysion816/roco-star-dmg-overlay/releases/latest)**，下载最新的 zip：
 
 ```
-roco-star-dmg-overlay-v1.0.1-win32-x64.zip    （约 72 MB）
-roco-star-dmg-overlay-v1.0.1-win32-x64.7z     （约 63 MB，需 7-Zip / Bandizip 解压）
+roco-star-dmg-overlay-v1.0.2-win32-x64.zip    （约 72 MB）
+roco-star-dmg-overlay-v1.0.2-win32-x64.7z     （约 63 MB，需 7-Zip / Bandizip 解压）
 ```
 
 > Release 资产名使用 ASCII：GitHub 上传接口会丢掉文件名里的非 ASCII 前缀。
