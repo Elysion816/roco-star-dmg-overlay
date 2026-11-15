@@ -1177,3 +1177,56 @@ body.collapsed .wbtn-more {
   body.collapsed .mini-search { flex: 4 1 0; max-width: 160px; min-width: 44px; }
   body.collapsed .mini-sum { gap: 4px; }
 }
+
+/* ===========================================================================
+   攻方卡片「选中」态：Tab / ↑↓ / 点击切换；Ctrl+↑↓ 改攻击加成、Alt+↑↓ 改威力加成
+   —— 圆环挂在 section.slot-card 上，不随内部按钮重建丢失
+   =========================================================================== */
+.slot-card { position: relative; }
+.slot-card.is-focus {
+  border-color: rgba(255, 204, 102, 0.72);
+  box-shadow: 0 0 0 1px rgba(255, 204, 102, 0.34), 0 4px 16px rgba(255, 170, 60, 0.20);
+}
+.slot-card.is-focus::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--gold), rgba(255, 154, 82, 0.55));
+}
+.slot-card.is-focus .slot-tag.atk {
+  color: #1a1206;
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+/* 小条摘要里的选中项：金色胶囊底（不改变宽度，不挤压数字，也不像超链接） */
+.mini-item.is-focus {
+  background: rgba(255, 204, 102, 0.16);
+  border-radius: 5px;
+  padding: 1px 4px;
+  margin: 0 -4px;
+}
+.mini-item.is-focus b.mini-name { color: var(--gold); }
+
+/* 快捷键面板里「本机操作」与「攻方焦点」两组之间的分隔 */
+.sc-row.sc-sep {
+  margin-top: 3px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(126, 160, 255, 0.18);
+}
+
+/* 加成已到上下界：输入框抖一下（键盘按到边界时的唯一反馈） */
+@keyframes mod-limit-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+.mod-input.is-limit {
+  animation: mod-limit-shake 0.18s ease-in-out 2;
+  border-color: rgba(255, 90, 90, 0.75);
+  color: var(--danger);
+}

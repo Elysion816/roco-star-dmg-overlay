@@ -11,7 +11,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { globalShortcut, screen } = require('electron');
+const { globalShortcut, screen, BrowserWindow } = require('electron');
 
 function createRunner(win, app, ROOT) {
   const js = code => win.webContents.executeJavaScript(code, true);
@@ -61,6 +61,14 @@ async function run(win, app, ROOT) {
   const results = {};
   const SEL_PICKER_ATK1 = '.picker-btn[data-slot="atk1"]';
   const SEL_PICKER_DEF = '.picker-btn[data-slot="def"]';
+
+  // ---- 焦点快捷键测试用的小工具（在多个步骤里共用，故提到最前）----
+  /** 派发一次 keydown 到当前聚焦元素（真实按键的 target 就是它）；未聚焦时退回 document */
+  const K = (key, mod) => '(function(){ var e = new KeyboardEvent("keydown", { key: ' + JSON.stringify(key) +
+    ', bubbles: true, cancelable: true' + (mod || '') + ' }); (document.activeElement && document.activeElement !== document.body ? document.activeElement : document).dispatchEvent(e); return true; })()';
+  /** 按 selector 取元素（外层用双引号拼，内层单引号由调用方写） */
+  const Q = sel => 'document.querySelector(' + JSON.stringify(sel) + ')';
+  const F = 'window.__xyDebug.focusRow';
   try {
     // 自适应高度（首次展开，用户还没手动拖过）
     await wait(700);
@@ -815,6 +823,65 @@ async function run(win, app, ROOT) {
     results.mods.minibar = await js('(function(){ var b = document.getElementById("minibar"); var boosts = document.querySelectorAll(".mini-boost").length; var names = Array.prototype.map.call(document.querySelectorAll(".mini-name"), function(e){ return { t: e.textContent, clipped: e.scrollWidth > e.clientWidth + 1 }; }); return { boosts: boosts, names: names, sumText: (document.getElementById("miniSum")||{}).textContent || "", overflow: b.scrollWidth - b.clientWidth, height: document.getElementById("titlebar").getBoundingClientRect().height }; })()');
     results.a20 = await capture('smoke-20-minibar-boost.png');
 
+    // ⑮c 小条（46px）态：Tab 选行 + Ctrl/Alt+↑↓ 调加成同样可用（常驻小条时的主要路径）
+    results.hotkeysMini = { steps: [] };
+    const miniStep = async (name, code) => {
+      if (code) await js(code);
+      await wait(260);
+      results.hotkeysMini.steps.push({
+        name: name,
+        focus: await js(F),
+        mods: await js('window.__xyDebug.mods'),
+        miniSum: await js('(document.getElementById("miniSum")||{}).textContent || ""'),
+        focusMarked: await js('Array.prototype.slice.call(document.querySelectorAll(".mini-item")).map(function(e){ return e.classList.contains("is-focus") ? e.getAttribute("data-row") : null; }).filter(Boolean)'),
+        collapsed: await js('document.body.classList.contains("collapsed")'),
+        overflow: await js('(function(){ var b = document.getElementById("minibar"); return b.scrollWidth - b.clientWidth; })()')
+      });
+    };
+    await js('(function(){ if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); return true; })()');
+    await miniStep('小条初始', null);
+    await miniStep('Tab→', K('Tab'));
+    await miniStep('Tab→', K('Tab'));
+    const miniBoundsBefore = win.getBounds();
+    await miniStep('Ctrl+↑（攻击 +50）', K('ArrowUp', ', ctrlKey: true'));
+    // 加成提示窗：应在主窗下方短暂浮出，**主窗尺寸/位置一格都不变**
+    await wait(300);
+    const toastWin = BrowserWindow.getAllWindows().filter(w => w !== win && !w.isDestroyed())[0] || null;
+    const tb = toastWin ? toastWin.getBounds() : null;
+    const mb = win.getBounds();
+    const toastPayload = await js('window.__xyDebug ? window.__xyDebug.toast : null');
+    const anchorX = toastPayload && typeof toastPayload.anchorX === 'number' ? toastPayload.anchorX : null;
+    results.toast = {
+      miniBoundsBefore: miniBoundsBefore,
+      miniBoundsAfter: mb,
+      miniSizeUnchanged: JSON.stringify(miniBoundsBefore) === JSON.stringify(mb),
+      windowCount: BrowserWindow.getAllWindows().length,
+      toastExists: !!toastWin,
+      toastVisible: toastWin ? toastWin.isVisible() : false,
+      toastBounds: tb,
+      // 位置断言：贴着主窗下沿 6px、宽度按内容收窄（远小于主窗 620）、左边缘在主窗内
+      belowMainWindow: !!(tb && Math.abs(tb.y - (mb.y + mb.height + 6)) <= 1),
+      narrowedToContent: !!(tb && tb.width < mb.width && tb.width >= 60),
+      alignedInside: !!(tb && tb.x >= mb.x - 1 && tb.x + tb.width <= mb.x + mb.width + 1),
+      // 与精灵名字对齐：提示窗左边缘 ≈ 主窗左边缘 + 该名字在摘要里的 x
+      anchorX: anchorX,
+      anchoredToName: !!(tb && anchorX !== null && Math.abs(tb.x - (mb.x + anchorX)) <= 1),
+      alwaysOnTop: toastWin ? toastWin.isAlwaysOnTop() : null,
+      toastPayload: toastPayload,
+      collapsed: await js('document.body.classList.contains("collapsed")'),
+      barHeight: await js('Math.round(document.getElementById("titlebar").getBoundingClientRect().height)'),
+      contentHidden: await js('getComputedStyle(document.getElementById("content")).display'),
+    };
+    await miniStep('Alt+↑（威力 +20）', K('ArrowUp', ', altKey: true'));
+    results.a20b = await capture('smoke-20b-minibar-hotkeys.png');
+    // 自动收起：等过提示时长后应自己隐藏（不常驻、不挡游戏）
+    await wait(2800);
+    results.toast.autoHidden = !(toastWin && !toastWin.isDestroyed() && toastWin.isVisible());
+    results.toast.mainStill46 = win.getBounds().height === 46;
+    // 复位小条里的改动
+    await js('(function(){ ["atk1","atk2","atk3"].forEach(function(r){ var a = document.querySelector(".mod-input[data-slot=\\"" + r + "\\"][data-mod=atkPct]"); a.value = "0"; a.dispatchEvent(new Event("change")); var b = document.querySelector(".mod-input[data-slot=\\"" + r + "\\"][data-mod=powerAdd]"); b.value = "0"; b.dispatchEvent(new Event("change")); }); return true; })()');
+    await wait(400);
+
     // 持久化：saveUI 后读回 state
     await wait(600);
     results.mods.persisted = await js('(async function(){ var st = await window.api.getState(); return st && st.ui && st.ui.mods ? st.ui.mods : null; })()');
@@ -826,6 +893,100 @@ async function run(win, app, ROOT) {
     await wait(600);
     results.mods.afterReset = await js('Array.prototype.slice.call(document.querySelectorAll(".cell-main")).map(function(e){ return e.textContent; })');
 
+    // ⑮b 焦点快捷键：Tab / ↑↓ 选攻方，Ctrl+↑↓ 攻击加成，Alt+↑↓ 威力加成（K / Q / F 见 run() 开头）
+    // 先清掉上一步留在加成输入框里的焦点：输入框内 Tab / 裸 ↑↓ 是原生行为（有意让位），
+    // 不 blur 的话这一段测的就不是"全局焦点快捷键"了。
+    await js('(function(){ if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); document.querySelector(".slot-card[data-slot=atk1] .slot-tag").click(); return true; })()');
+    await wait(260);
+    results.hotkeys = { steps: [] };
+    const step = async (name, code, ms) => {
+      if (code) await js(code);
+      await wait(ms == null ? 220 : ms);
+      results.hotkeys.steps.push({ name: name, focus: await js(F), mods: await js('window.__xyDebug.mods') });
+    };
+
+    await step('初始', null, 100);
+    await step('Tab→', K('Tab'));
+    await step('Tab→', K('Tab'));
+    await step('Tab→(回环)', K('Tab'));
+    await step('Shift+Tab←', K('Tab', ', shiftKey: true'));
+    await step('裸 ↓ 到底', K('ArrowDown') + '; ' + K('ArrowDown'));
+    await step('点 atk2 卡片', Q('.slot-card[data-slot="atk2"] .slot-tag') + '.click()');
+    await step('Ctrl+↑ ×1', K('ArrowUp', ', ctrlKey: true'));
+    await step('Ctrl+↓ ×2', K('ArrowDown', ', ctrlKey: true') + '; ' + K('ArrowDown', ', ctrlKey: true'));
+    await step('Alt+↑ ×2', K('ArrowUp', ', altKey: true') + '; ' + K('ArrowUp', ', altKey: true'));
+    await step('Alt+↓ ×1', K('ArrowDown', ', altKey: true'));
+
+    // 输入框内 Ctrl+↑：作用于该输入框所在行（atk3），且输入框显示同步刷新
+    await js(Q('.mod-input[data-slot="atk3"][data-mod="atkPct"]') + '.focus()');
+    await step('焦点在 atk3 输入框，Ctrl+↑', K('ArrowUp', ', ctrlKey: true'));
+    results.hotkeys.inputRow = await js('({ focus: document.activeElement && document.activeElement.getAttribute("data-slot"), shown: ' + Q('.mod-input[data-slot="atk3"][data-mod="atkPct"]') + '.value, model: String(window.__xyDebug.mods.atk3.atkPct), cells: Array.prototype.slice.call(document.querySelectorAll(".cell-main")).map(function(e){ return e.textContent; }) })');
+    results.hotkeys.ring = await js('Array.prototype.slice.call(document.querySelectorAll(".slot-card")).map(function(e){ return { slot: e.getAttribute("data-slot"), focus: e.classList.contains("is-focus") }; })');
+    results.a21b = await capture('smoke-21b-focus-hotkeys.png');
+
+    // 边界：atk2 攻击加成按到 +300 后不再上涨（且有 is-limit 闪一下）
+    // 先让焦点离开输入框、并点 atk2 卡片把作用行钉到 atk2
+    await js('(function(){ if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); ' + Q('.slot-card[data-slot="atk2"] .slot-tag') + '.click(); return true; })()');
+    await wait(300);
+    await js('(function(){ for (var i = 0; i < 12; i++) { var e = new KeyboardEvent("keydown", { key: "ArrowUp", ctrlKey: true, bubbles: true, cancelable: true }); document.dispatchEvent(e); } return true; })()');
+    await wait(400);
+    results.hotkeys.upperBound = {
+      value: await js('window.__xyDebug.mods.atk2.atkPct'),
+      shown: await js(Q('.mod-input[data-slot="atk2"][data-mod="atkPct"]') + '.value'),
+      plusDisabled: await js(Q('.mod-btn[data-slot="atk2"][data-mod="atkPct"][data-dir="1"]') + '.disabled'),
+      limitFlash: await js(Q('.mod-input[data-slot="atk2"][data-mod="atkPct"]') + '.classList.contains("is-limit")'),
+      title: await js(Q('.mod-input[data-slot="atk2"][data-mod="atkPct"]') + '.title')
+    };
+    // 输入框聚焦时，裸 ↑↓ 保持原生（不切行）；Ctrl+↑ 仍作用于该行
+    await js(Q('.mod-input[data-slot="atk1"][data-mod="atkPct"]') + '.focus()');
+    await wait(120);
+    results.hotkeys.typingPlainArrow = {
+      before: await js(F),
+      afterJs: await js(K('ArrowDown')),
+      after: await js(F)
+    };
+    await js('(function(){ if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); return true; })()');
+    await wait(120);
+
+    // 明细面板打开时：Tab / 裸 ↑↓ 让位，但 Ctrl+↑ 仍作用于当前选中行并即时重算
+    // （先把 atk2 的攻击加成复位：上一步边界测试把它顶在上限 300，会让增量断言失真）
+    await js('(function(){ var i = document.querySelector(".mod-input[data-slot=atk2][data-mod=atkPct]"); i.value = "0"; i.dispatchEvent(new Event("change")); return true; })()');
+    await wait(350);
+    await js('document.querySelector(".grid-row[data-row=atk2] .cell").click()');
+    await wait(450);
+    results.hotkeys.detailOpen = {
+      open: await js('!document.getElementById("detail").classList.contains("is-hidden")'),
+      focusBefore: await js(F),
+      modsBefore: await js('window.__xyDebug.mods.atk2'),
+      cellsBefore: await js('Array.prototype.slice.call(document.querySelectorAll(".grid-row[data-row=atk2] .cell-main")).map(function(e){ return e.textContent; })')
+    };
+    await js(K('ArrowDown'));            // 裸 ↓：明细里应被忽略
+    await js(K('Tab'));                  // Tab：也应被忽略
+    await wait(200);
+    results.hotkeys.detailOpen.focusAfterPlainKeys = await js(F);
+    await js(K('ArrowUp', ', ctrlKey: true'));   // Ctrl+↑：atk2 攻击加成 +50
+    await wait(450);
+    results.hotkeys.detailOpen.mods = await js('window.__xyDebug.mods.atk2');
+    results.hotkeys.detailOpen.cells = await js('Array.prototype.slice.call(document.querySelectorAll(".grid-row[data-row=atk2] .cell-main")).map(function(e){ return e.textContent; })');
+    results.a21c = await capture('smoke-21c-hotkeys-detail-open.png');
+    await js('document.getElementById("detailClose").click()');
+    await wait(250);
+
+    // 选择器打开时 Tab 不抢（焦点快捷键整体让位，仍由选择器自己处理）
+    await js(Q('.picker-btn[data-slot="atk1"]') + '.click()');
+    await wait(350);
+    results.hotkeys.beforePickerTab = await js(F);
+    await js(K('Tab'));
+    await wait(220);
+    results.hotkeys.pickerStillOpen = await js('!document.getElementById("picker").classList.contains("is-hidden")');
+    // 焦点只在「打开选择器时点了 atk1 卡片」那一下变过一次；Tab 本身不再改
+    results.hotkeys.focusUnchangedByPickerTab = (await js(F)) === results.hotkeys.beforePickerTab;
+    await js('document.getElementById("pickerClose").click()');
+    await wait(250);
+
+    // 复位键盘改动
+    await js('(function(){ ["atk1","atk2","atk3"].forEach(function(r){ var a = document.querySelector(".mod-input[data-slot=\\"" + r + "\\"][data-mod=atkPct]"); a.value = "0"; a.dispatchEvent(new Event("change")); var b = document.querySelector(".mod-input[data-slot=\\"" + r + "\\"][data-mod=powerAdd]"); b.value = "0"; b.dispatchEvent(new Event("change")); }); return true; })()');
+    await wait(500);
 
     // ⑯ 紧凑布局：内容高度 / 信息完整性 / 自适应窗口
     await js('window.api.setCollapsed(false)');

@@ -9,6 +9,7 @@
  *  4. 状态持久化（窗口位置尺寸 + 业务状态）到 userData/state.json
  *  5. 启动时从 https://stardmg.top 拉取最新图鉴数据（3s 超时，失败静默用内置包）
  *  6. 托盘菜单
+ *  7. 加成提示小窗（小条态按 Ctrl/Alt+↑↓ 时在主窗下方短暂浮出一条，**不改主窗尺寸**）
  */
 const { app, BrowserWindow, globalShortcut, ipcMain, Tray, Menu, nativeImage, shell, screen } = require('electron');
 const path = require('node:path');
@@ -18,6 +19,9 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const ICON_PNG = path.join(ROOT, 'src', 'assets', 'icon.png');
 const PRELOAD = path.join(__dirname, 'preload.js');
 const INDEX = path.join(ROOT, 'src', 'renderer', 'index.html');
+// 加成提示小窗（小条态用）：独立 BrowserWindow，主窗尺寸一格都不动
+const TOAST_PRELOAD = path.join(__dirname, 'toast-preload.js');
+const TOAST_INDEX = path.join(ROOT, 'src', 'renderer', 'toast.html');
 
 const WIN_DEFAULT = { width: 620, height: 880 };
 const COLLAPSED_HEIGHT = 46;
@@ -164,6 +168,16 @@ let collapsed = false;
 let onlineData = null;
 let dataStatus = { source: 'builtin', fetchedAt: 0, message: '内置数据' };
 
+// ---- 加成提示小窗的状态 ----
+/** 提示窗的 BrowserWindow（懒创建、常驻复用；隐藏时不销毁，避免反复创建开销） */
+let toastWin = null;
+/** 自动隐藏定时器 */
+let toastTimer = null;
+/** 渲染层最近一次请求的锚点（精灵名字的相对 x + 期望宽度），窗口移动时用它重算位置 */
+let toastAnchor = { x: 10, w: 120 };
+/** 提示窗当前显示的内容（重新定位时不需要重传） */
+let toastPayload = null;
+
 function pickBounds() {
   const w = state.window || {};
   const width = Math.max(MIN_WIDTH, Number(w.width) || WIN_DEFAULT.width);
@@ -273,9 +287,13 @@ function createWindow() {
 
   win.on('move', persistBounds);
   win.on('resize', persistBounds);
-  win.on('closed', () => { win = null; });
+  win.on('closed', () => { win = null; hideToast(); });
   win.on('show', sendMode);
-  win.on('hide', sendMode);
+  win.on('hide', () => { sendMode(); hideToast(); });
+
+  // 主窗一移动/改尺寸，提示窗要么跟着重新贴边，要么直接收起（跟着拖动会闪，收起更干净）
+  win.on('move', () => { if (toastWin && !toastWin.isDestroyed() && toastWin.isVisible()) hideToast(); });
+  win.on('resize', () => { if (toastWin && !toastWin.isDestroyed() && toastWin.isVisible()) placeToast(toastAnchor.w); });
   // 失焦时若仍处于交互态，主进程不强行切穿透（避免用户在系统弹窗时被打断）
 }
 
@@ -493,6 +511,126 @@ function restoreWindowFromMenu() {
   win.setResizable(false); // 小条固定尺寸
 }
 
+// ---------------------------------------------------------------------------
+// 加成提示小窗（toast）
+// ---------------------------------------------------------------------------
+/**
+ * 为什么用独立窗口而不是把主窗撑高：
+ *   小条是 46px 的条，撑高会让它压住游戏画面、并且要处理"什么时候收回"。
+ *   独立窗口可以点击穿透（setIgnoreMouseEvents + setFocusable(false)），
+ *   高度由内容决定、位置贴着主窗下沿，主窗尺寸与位置完全不变。
+ *
+ * 位置：主窗下沿 + 6px；若下方空间不够则翻到主窗上沿之上（保持左对齐锚点）。
+ * 宽度：由渲染层实测内容宽度回报，主进程收窄到刚好包住（不撑满整窗）。
+ */
+// 高度：Windows 对无边框透明窗口有最小跟踪高度（实测 36px 起才不被强行撑高），
+// 内容在这个高度里垂直居中。
+const TOAST_H = 36;
+const TOAST_MAX_W = 280;
+
+function ensureToastWindow() {
+  if (toastWin && !toastWin.isDestroyed()) return toastWin;
+  toastWin = new BrowserWindow({
+    width: TOAST_MAX_W,
+    height: TOAST_H,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    focusable: false,       // 永不抢焦点：游戏/主窗的键盘焦点不受影响
+    hasShadow: false,
+    acceptFirstMouse: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: TOAST_PRELOAD,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      backgroundThrottling: false,
+      spellcheck: false,
+    },
+  });
+  toastWin.setAlwaysOnTop(true, TOP_LEVEL);
+  toastWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  toastWin.setIgnoreMouseEvents(true, { forward: false }); // 点击完全穿透给下层
+  toastWin.setMenuBarVisibility(false);
+  toastWin.loadFile(TOAST_INDEX);
+  toastWin.on('closed', () => { toastWin = null; });
+  return toastWin;
+}
+
+/** 算出提示窗应该出现在哪（贴着主窗下沿，必要时翻到上方） */
+function computeToastBounds(contentW) {
+  if (!win || win.isDestroyed()) return null;
+  const b = win.getBounds();
+  const area = screen.getDisplayMatching(b).workArea;
+  const w = Math.max(56, Math.min(TOAST_MAX_W, Math.round(contentW) || 120));
+  // 左边界：主窗左边 + 精灵名字的锚点 x，但不越过主窗右沿、不越过显示器
+  const anchorX = b.x + Math.max(0, Math.min(b.width - w, Math.round(toastAnchor.x) || 0));
+  const x = Math.max(area.x, Math.min(area.x + area.width - w, anchorX));
+  let y = b.y + b.height + 6;                      // 默认：主窗下沿之下
+  if (y + TOAST_H > area.y + area.height) {         // 贴屏幕底部 → 翻到主窗上方
+    y = Math.max(area.y, b.y - TOAST_H - 6);
+  }
+  return { x, y, width: w, height: TOAST_H };
+}
+
+/** 定位（不改可见性） */
+function placeToast(contentW) {
+  if (!toastWin || toastWin.isDestroyed()) return;
+  const nb = computeToastBounds(contentW);
+  if (!nb) return;
+  const cur = toastWin.getBounds();
+  if (cur.x === nb.x && cur.y === nb.y && cur.width === nb.width && cur.height === nb.height) return;
+  toastWin.setBounds(nb);
+}
+
+/** 立即隐藏提示窗（不销毁，下次复用） */
+function hideToast() {
+  if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+  if (toastWin && !toastWin.isDestroyed() && toastWin.isVisible()) toastWin.hide();
+}
+
+/**
+ * 显示一条加成提示。
+ * @param {{main:string, sub?:string, tone?:'normal'|'danger', anchorX?:number,
+ *          contentW?:number, durationMs?:number}} payload
+ */
+function showToast(payload) {
+  if (!payload || !payload.main) return false;
+  toastPayload = payload;
+  if (typeof payload.anchorX === 'number' && Number.isFinite(payload.anchorX)) {
+    toastAnchor.x = Math.max(0, Math.round(payload.anchorX));
+  }
+  if (typeof payload.contentW === 'number' && payload.contentW > 0) {
+    toastAnchor.w = Math.round(payload.contentW);
+  }
+  const w = ensureToastWindow();
+  const send = () => {
+    if (!toastWin || toastWin.isDestroyed()) return;
+    toastWin.webContents.send('toast', {
+      main: payload.main,
+      sub: payload.sub || '',
+      tone: payload.tone === 'danger' ? 'danger' : 'normal',
+    });
+    placeToast(toastAnchor.w);
+    if (!toastWin.isVisible()) toastWin.showInactive(); // 不抢焦点
+  };
+  if (w.webContents.isLoading()) w.webContents.once('did-finish-load', send);
+  else send();
+  // 自动收起：按内容长度给 1.6s 打底，长文本多留一点
+  const dur = Math.max(900, Math.min(4000, Math.round(payload.durationMs) ||
+    (1400 + String(payload.main).length * 28 + String(payload.sub || '').length * 18)));
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastTimer = null; hideToast(); }, dur);
+  return true;
+}
+
 function sendMode() {
   if (!win) return;
   win.webContents.send('mode', {
@@ -673,6 +811,16 @@ function registerIPC() {
     return true;
   });
 
+  // 加成提示小窗：渲染层请求显示/隐藏，并回报实测内容宽度
+  ipcMain.handle('toast:show', (_e, payload) => showToast(payload));
+  ipcMain.handle('toast:hide', () => { hideToast(); return true; });
+  ipcMain.on('toast:size', (_e, w) => {
+    const width = Math.round(Number(w) || 0);
+    if (!(width > 0)) return;
+    toastAnchor.w = width;
+    if (toastWin && !toastWin.isDestroyed() && toastWin.isVisible()) placeToast(width);
+  });
+
   ipcMain.handle('win:passthrough', (_e, v) => setPassthrough(!!v));
   ipcMain.handle('win:toggle-passthrough', () => togglePassthrough());
   ipcMain.handle('win:close', () => { saveState(true); if (win) win.close(); app.quit(); return true; });
@@ -714,6 +862,8 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('will-quit', () => {
     globalShortcut.unregisterAll();
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    if (toastWin && !toastWin.isDestroyed()) { try { toastWin.destroy(); } catch (e) { /* 忽略 */ } }
     saveState(true);
   });
 

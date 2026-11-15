@@ -71,10 +71,14 @@
           <div class="sc-row"><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>T</kbd><span>切换 穿透 / 接管</span></div>
           <div class="sc-row"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>M</kbd><span>收成小条 / 展开</span></div>
           <div class="sc-row"><kbd>Esc</kbd><span>逐层关闭面板 · 全关后交还鼠标</span></div>
+          <div class="sc-row sc-sep"><kbd>Tab</kbd><span>选中下一个攻方（Shift+Tab 上一个；也可直接点击卡片）</span></div>
+          <div class="sc-row"><kbd>↑</kbd><kbd>↓</kbd><span>在攻① / 攻② / 多维手之间移动</span></div>
+          <div class="sc-row"><kbd>Ctrl</kbd><kbd>↑</kbd><kbd>↓</kbd><span>调当前攻方的攻击加成（±50%）</span></div>
+          <div class="sc-row"><kbd>Alt</kbd><kbd>↑</kbd><kbd>↓</kbd><span>调当前攻方的威力加成（±20 威力）</span></div>
         </div>
       </div>
 
-      <section class="card slot-card" data-slot="atk1">
+      <section class="card slot-card" data-slot="atk1" title="点击选中这一行；Tab / ↑↓ 切换，Ctrl+↑↓ 调攻击加成，Alt+↑↓ 调威力加成">
         <div class="slot-line">
           <span class="slot-tag atk">攻①</span>
           <button class="picker-btn" data-slot="atk1" title="点击选择精灵（可用拼音/首字母/图鉴号搜索）"></button>
@@ -102,7 +106,7 @@
         </div>
       </section>
 
-      <section class="card slot-card" data-slot="atk2">
+      <section class="card slot-card" data-slot="atk2" title="点击选中这一行；Tab / ↑↓ 切换，Ctrl+↑↓ 调攻击加成，Alt+↑↓ 调威力加成">
         <div class="slot-line">
           <span class="slot-tag atk">攻②</span>
           <button class="picker-btn" data-slot="atk2" title="点击选择精灵（可用拼音/首字母/图鉴号搜索）"></button>
@@ -131,7 +135,7 @@
       </section>
 
       <!-- 多维手：第三个攻方，默认锁「多维击打」（幻系不引爆星陨） -->
-      <section class="card slot-card" data-slot="atk3">
+      <section class="card slot-card" data-slot="atk3" title="点击选中这一行；Tab / ↑↓ 切换，Ctrl+↑↓ 调攻击加成，Alt+↑↓ 调威力加成">
         <div class="slot-line">
           <span class="slot-tag atk">多维手</span>
           <button class="picker-btn" data-slot="atk3" title="多维手：默认锁「多维击打」（幻系 15 威力，每层星陨 +1 连击）"></button>

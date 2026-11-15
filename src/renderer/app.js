@@ -59,12 +59,22 @@
     collapsedGroups: Object.create(null),
     highlight: -1,
     grid: null,
+    /** 当前「选中」的攻方行：Tab / 点击 / ↑↓ 切换，Ctrl/Alt+↑↓ 作用于它 */
+    focusRow: 'atk1',
+    /** 最近一次加成提示的参数（小条态才弹；供调试钩子读，不影响业务） */
+    lastToast: null,
   };
 
   const ROWS = ['atk1', 'atk2', 'atk3'];
   const SLOT_NAME = { atk1: '攻①', atk2: '攻②', atk3: '多维手', def: '靶子' };
   /** 「多维手」槽位默认锁定的技能：多维击打（幻系 15 威力，每层星陨 +1 连击） */
   const MULTI_HIT_SKILL = '多维击打';
+
+  // ---- 键盘调整加成的步进（沿用按钮上的 data-step 口径）----
+  /** Ctrl+↑↓ = 攻击加成：±50%（−100 ~ +300） */
+  const HOTKEY_ATK_STEP = 50;
+  /** Alt+↑↓ = 威力加成：±20 威力点（−100 ~ +300） */
+  const HOTKEY_POWER_STEP = 20;
 
   let saveTimer = null;
   function saveUI() {
@@ -370,7 +380,7 @@
   };
 
   /** 把 ui.mods 同步到控件（数值、边界禁用、非 0 高亮） */
-  function syncModControls(row) {
+  function syncModControls(row, force) {
     const mods = (ui.mods && ui.mods[row]) || { atkPct: 0, powerAdd: 0 };
     for (const key of ['atkPct', 'powerAdd']) {
       const spec = MOD_SPEC[key];
@@ -378,7 +388,8 @@
       mods[key] = v;
       const inp = document.querySelector('.mod-input[data-slot="' + row + '"][data-mod="' + key + '"]');
       if (inp) {
-        if (document.activeElement !== inp) inp.value = String(v);
+        // force=true 时连聚焦中的输入框也回写：键盘改值后显示必须与内部一致
+        if (force || document.activeElement !== inp) inp.value = String(v);
         inp.classList.toggle('is-on', v !== 0);
       }
       const minus = document.querySelector('.mod-btn[data-slot="' + row + '"][data-mod="' + key + '"][data-dir="-1"]');
@@ -394,12 +405,52 @@
     const spec = MOD_SPEC[key] || MOD_SPEC.atkPct;
     const before = ui.mods[row][key];
     const next = spec.clamp(value);
-    if (next === before) { syncModControls(row); return next; }
+    if (next === before) { syncModControls(row, true); return next; }
     ui.mods[row][key] = next;
-    syncModControls(row);
+    syncModControls(row, true);
     recompute();
     saveUI();
     return next;
+  }
+
+  /**
+   * 小条态：改完加成在「精灵名字」正下方浮一条提示（增益显示，1.4s 后自动消失）。
+   * 用独立小窗（主进程 toast）而不是把 46px 小条撑高——小条一撑高就会压住游戏画面。
+   * 锚点取该行在 #miniSum 里的左边缘，宽度交给主进程按内容收窄。
+   */
+  function showModToast(row, key, extra) {
+    if (!api || !api.showToast || !view.collapsed) return;
+    const m = (ui.mods && ui.mods[row]) || { atkPct: 0, powerAdd: 0 };
+    const isAtk = key === 'atkPct';
+    const v = isAtk ? (m.atkPct || 0) : (m.powerAdd || 0);
+    const spec = MOD_SPEC[key] || MOD_SPEC.atkPct;
+    const limitOnly = !!(extra && extra.limitOnly);
+    const atMax = v >= spec.max;
+    const main = limitOnly
+      ? (isAtk ? '攻击 ' : '威力 ') + '已到' + (atMax ? '上限 +' + spec.max : '下限 ' + spec.min) + (isAtk ? '%' : '')
+      : (isAtk ? '攻击 ' : '威力 ') + (v > 0 ? '+' : '') + v + (isAtk ? '%' : '');
+    // 副文本：该行三档层数，调完立刻看到效果
+    const entry = view.grid ? view.grid.cells.filter(c => c.row === row) : [];
+    const layers = D.DEFENDER_TIERS.map(t => {
+      const hit = entry.filter(c => c.tier.key === t.key)[0];
+      const L = hit && hit.cell ? hit.cell.layer : null;
+      return L === null ? overLayerText() : String(L);
+    });
+    const item = document.querySelector('#miniSum .mini-item[data-row="' + row + '"]');
+    const rect = item ? item.getBoundingClientRect() : null;
+    const payload = {
+      main: main,
+      sub: layers.join('/'),
+      tone: extra && extra.danger ? 'danger' : 'normal',
+      anchorX: rect ? Math.max(0, Math.round(rect.left)) : 10,
+      row: row,
+      key: key,
+    };
+    view.lastToast = payload;
+    view.lastToastAt = Date.now();
+    try {
+      api.showToast(payload);
+    } catch (e) { /* 提示失败不影响数值 */ }
   }
 
   /** 加成摘要文本（0 不显示）：攻击按 %，威力按点数 */
@@ -483,6 +534,7 @@
     defSel.value = ui.skills.def || '__none__';
 
     wireAvatars(document);
+    refreshFocusRing(); // 卡片内的按钮会重建，圆环挂在 section 上，这里补一次
   }
 
   // -------------------------------------------------------------------------
@@ -595,6 +647,59 @@
     }, 160);
   }
 
+  // -------------------------------------------------------------------------
+  // 5.1 攻方焦点（Tab / 点击 / ↑↓ 切换；Ctrl/Alt+↑↓ 作用于当前选中的攻方）
+  // -------------------------------------------------------------------------
+  function focusCardEl(row) {
+    return document.querySelector('.slot-card[data-slot="' + row + '"]');
+  }
+
+  /** 把 .is-focus 圆环画到当前行（卡片本身不重建，这里只切 class） */
+  function refreshFocusRing() {
+    for (const row of ROWS) {
+      const el = focusCardEl(row);
+      if (el) el.classList.toggle('is-focus', row === view.focusRow);
+    }
+    const mini = $('#miniSum');
+    if (mini) {
+      Array.prototype.slice.call(mini.querySelectorAll('.mini-item')).forEach(el => {
+        el.classList.toggle('is-focus', el.getAttribute('data-row') === view.focusRow);
+      });
+    }
+  }
+
+  /**
+   * 选中某一行攻方。
+   * @param {'atk1'|'atk2'|'atk3'} row
+   * @param {{scroll?: boolean}} [opts] scroll=false 时只切环不滚动（Tab 连续切换不晃屏）
+   */
+  function setFocusRow(row, opts) {
+    if (ROWS.indexOf(row) < 0) return view.focusRow;
+    view.focusRow = row;
+    refreshFocusRing();
+    if (opts && opts.scroll === false) return row;
+    const el = focusCardEl(row);
+    if (el && el.scrollIntoView) {
+      try { el.scrollIntoView({ block: 'nearest' }); } catch (e) { /* 忽略 */ }
+    }
+    return row;
+  }
+
+  /** Tab：攻① → 攻② → 多维手 → 攻①（Shift+Tab 反向） */
+  function cycleFocusRow(dir) {
+    const i = Math.max(0, ROWS.indexOf(view.focusRow));
+    const next = ROWS[(i + (dir < 0 ? -1 : 1) + ROWS.length) % ROWS.length];
+    return setFocusRow(next);
+  }
+
+  /** ↑ / ↓：在三个攻方之间移动（不带修饰键时） */
+  function moveFocusRow(dir) {
+    const i = Math.max(0, ROWS.indexOf(view.focusRow));
+    const next = Math.max(0, Math.min(ROWS.length - 1, i + (dir < 0 ? -1 : 1)));
+    if (next === i) return view.focusRow;
+    return setFocusRow(next);
+  }
+
   function renderGrid() {
     const grid = view.grid;
     for (const row of ROWS) {
@@ -657,6 +762,7 @@
         saveUI();
       });
     }
+    refreshFocusRing();
   }
 
   function renderMinibar() {
@@ -684,7 +790,10 @@
       const boost = mtext
         ? '<span class="mini-boost" title="' + esc(mtext) + '">⁺</span>'
         : '';
-      parts.push('<span class="mini-item" data-row="' + row + '">' +
+      // #miniSum 整块是 drag 区（点它等于拖窗口），所以这里只做「选中态」的视觉标记；
+      // 切换选中用键盘：Tab / ↑↓ 选行，Ctrl+↑↓ 攻击加成，Alt+↑↓ 威力加成。
+      parts.push('<span class="mini-item' + (row === view.focusRow ? ' is-focus' : '') + '" data-row="' + row +
+        '" title="Tab / ↑↓ 切换攻方；Ctrl+↑↓ 攻击加成；Alt+↑↓ 威力加成">' +
         '<b class="mini-name" title="' + esc(sprite ? sprite.name : SLOT_NAME[row]) + '">' + esc(label) + '</b>' +
         boost + body + '</span>');
     }
@@ -1174,6 +1283,121 @@
   // -------------------------------------------------------------------------
   // 7. 事件绑定
   // -------------------------------------------------------------------------
+  // 7.1 焦点快捷键：Tab / ↑↓ 选攻方，Ctrl+↑↓ 调攻击加成，Alt+↑↓ 调威力加成
+  // -------------------------------------------------------------------------
+  /** 正在打字/选值时不抢键（输入框、下拉、可编辑区） */
+  function isTypingTarget(t) {
+    if (!t || !t.tagName) return false;
+    const tag = String(t.tagName).toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (t.isContentEditable) return true;
+    return false;
+  }
+
+  /** 精灵选择器 / 小条菜单 / ⋯ 菜单打开时，焦点快捷键整体让位（那里要用 Tab / ↑↓ 选精灵） */
+  function overlaysOpen() {
+    const pickerEl = $('#picker');
+    const pickerOpen = pickerEl && !pickerEl.classList.contains('is-hidden');
+    return !!(pickerOpen || miniMenu.open || moreMenu.open);
+  }
+  /** 明细面板打开时：只放行加成快捷键（改完立刻重算明细），Tab / 裸 ↑↓ 让位 */
+  function detailOpen() {
+    const el = $('#detail');
+    return !!(el && !el.classList.contains('is-hidden'));
+  }
+
+  /**
+   * @returns {boolean} true = 已处理（调用方不要再处理该按键）
+   */
+  function handleFocusHotkeys(e) {
+    if (e.defaultPrevented) return false;
+    if (e.isComposing || e.keyCode === 229) return false; // 中文输入法组合中
+    if (overlaysOpen()) return false;                   // 选择器 / 菜单打开时不抢（明细只让位 Tab 与裸 ↑↓）
+
+    const key = e.key;
+    const plain = !e.ctrlKey && !e.altKey && !e.metaKey;
+    const typing = isTypingTarget(e.target);
+    // 加成快捷键的作用行：输入框里按键时优先作用于该输入框所在行，否则作用于当前选中的行
+    const modRow = (() => {
+      const holder = e.target && e.target.closest ? e.target.closest('.mods[data-slot], .slot-card[data-slot]') : null;
+      const row = holder && holder.getAttribute('data-slot');
+      return row && ROWS.indexOf(row) >= 0 ? row : view.focusRow;
+    })();
+
+    // Ctrl+↑↓：攻击加成（百分比）—— 输入框里也生效，作用行按 modRow
+    if (key === 'ArrowUp' || key === 'ArrowDown') {
+      if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        bumpMod(modRow, 'atkPct', (key === 'ArrowUp' ? 1 : -1) * HOTKEY_ATK_STEP);
+        return true;
+      }
+      // Alt+↑↓：威力加成（威力点数）
+      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        bumpMod(modRow, 'powerAdd', (key === 'ArrowUp' ? 1 : -1) * HOTKEY_POWER_STEP);
+        return true;
+      }
+    }
+
+    if (typing) return false;                           // 剩下的（Tab / 裸 ↑↓）在输入框里保持原生行为
+    if (detailOpen()) return false;                     // 明细面板里的 Tab / ↑↓ 不抢（加成已在上面处理）
+
+    // Tab / Shift+Tab：循环选中三个攻方（按住不放只走一格，避免刷过头）
+    if (key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      if (!e.repeat) cycleFocusRow(e.shiftKey ? -1 : 1);
+      return true;
+    }
+
+    // 裸 ↑ / ↓：在三个攻方之间移动（同上，忽略 auto-repeat）
+    if (plain && !e.shiftKey && (key === 'ArrowUp' || key === 'ArrowDown')) {
+      e.preventDefault();
+      if (!e.repeat) moveFocusRow(key === 'ArrowUp' ? -1 : 1);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * 改当前行的某个加成（键盘路径）。
+   * 与按钮点击同一套 setMod：夹紧 → 同步控件 → 重算 → 落盘。
+   * 边界（已到 −100 / +300）时给一次轻提示，避免"按了没反应"的错觉。
+   */
+  function bumpMod(row, key, delta) {
+    if (!row || ROWS.indexOf(row) < 0) return;
+    const cur = (ui.mods[row] && ui.mods[row][key]) || 0;
+    const spec = MOD_SPEC[key] || MOD_SPEC.atkPct;
+    const next = spec.clamp(cur + delta);
+    if (next === cur) {
+      flashModLimit(row, key, spec);
+      // 小条态没有可以抖的输入框（被 CSS 隐藏了），改在提示条里说明「已到上限」
+      showModToast(row, key, { danger: true, limitOnly: true });
+      return;
+    }
+    setMod(row, key, next);
+    showModToast(row, key);
+  }
+
+  /** 到达上下界时让对应控件抖一下（纯 CSS 动画，不改数值）；小条态控件不可见，跳过 */
+  function flashModLimit(row, key, spec) {
+    if (view.collapsed) return;
+    const cur = (ui.mods[row] && ui.mods[row][key]) || 0;
+    const atMax = cur >= spec.max;
+    const inp = document.querySelector('.mod-input[data-slot="' + row + '"][data-mod="' + key + '"]');
+    if (!inp) return;
+    // 记住原始 title，闪完要还回去（否则边界提示会永久钉在输入框上）
+    if (inp.dataset.title0 === undefined) inp.dataset.title0 = inp.title || '';
+    inp.classList.remove('is-limit');
+    void inp.offsetWidth; // 强制回流，让动画可重复触发
+    inp.classList.add('is-limit');
+    inp.title = (key === 'atkPct' ? '攻击加成' : '威力加成') +
+      '已到' + (atMax ? '上限 +' + spec.max + (key === 'atkPct' ? '%' : ' 点') : '下限 ' + spec.min + (key === 'atkPct' ? '%' : ' 点'));
+    setTimeout(() => {
+      inp.classList.remove('is-limit');
+      inp.title = inp.dataset.title0 || '';
+    }, 420);
+  }
+
   function bindEvents() {
     // 选择器按钮
     $$('.picker-btn').forEach(btn => {
@@ -1210,6 +1434,15 @@
         recompute();
         saveUI();
       });
+    });
+
+    // 点击任一攻方卡片 → 选中该行（点格子也会顺手切换，随后照常开明细）
+    document.addEventListener('click', e => {
+      const card = e.target.closest ? e.target.closest('.slot-card[data-slot]') : null;
+      if (card) {
+        const row = card.getAttribute('data-slot');
+        if (ROWS.indexOf(row) >= 0 && row !== view.focusRow) setFocusRow(row, { scroll: false });
+      }
     });
 
     // 结果格 → 明细
@@ -1352,7 +1585,9 @@
       inp.addEventListener('change', commit);
       inp.addEventListener('blur', commit);
       inp.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); commit(); inp.blur(); }
+        if (e.key === 'Enter') { e.preventDefault(); commit(); inp.blur(); return; }
+        // Ctrl/Alt + ↑↓ 放行给全局快捷键（改的就是这一行的加成），其余按键仍按原样隔离
+        if ((e.ctrlKey || e.altKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) return;
         e.stopPropagation();
       });
     });
@@ -1492,6 +1727,7 @@
     // 全局键盘
     document.addEventListener('keydown', e => {
       if (e.defaultPrevented) return; // 内层（搜索框等）已经处理过，别重复执行
+      if (handleFocusHotkeys(e)) return;
       if (e.key === 'Escape') {
         if (moreMenu.open) { closeMoreMenu(); return; }
         if (miniMenu.open) { closeMiniMenu(); return; }
@@ -1728,6 +1964,11 @@
     get lastFullMs() { return view.lastFullMs; },
     get gridMs() { return view.grid ? view.grid.ms : -1; },
     get values() { return view.grid ? view.grid.cells.map(c => (c.cell ? c.cell.layer : 'x')) : []; },
+    get focusRow() { return view.focusRow; },
+    get mods() { return JSON.parse(JSON.stringify(ui.mods)); },
+    /** 最近一次加成提示的参数（null = 没弹；供 QA/自动化核对，只读） */
+    get toast() { return view.lastToast ? JSON.parse(JSON.stringify(view.lastToast)) : null; },
+    get toastShown() { return !!view.lastToast; },
     recompute: () => recompute(),
   };
 

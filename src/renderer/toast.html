@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'" />
+  <title>星陨斩杀线 · 加成</title>
+  <style>
+    /* 独立小窗：整窗透明，只有胶囊本体有底色（与小条同一套深色玻璃口径） */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+      font: 11px/1 "Microsoft YaHei", "Segoe UI", "PingFang SC", sans-serif;
+    }
+    /* 窗口高度固定 36（系统下限），内容在这个高度里垂直居中、水平左对齐 */
+    #wrap {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+      height: 100%;
+      min-width: 60px;
+    }
+    #toast {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      max-width: 276px;
+      padding: 3px 9px 4px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 204, 102, 0.46);
+      background: rgba(10, 14, 24, 0.97);
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+      color: #ffcc66;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    #toast.is-danger {
+      border-color: rgba(255, 90, 90, 0.62);
+      color: #ff5a5a;
+    }
+    #tMain { font-size: 11.5px; font-weight: 700; font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace; }
+    #tSub {
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(232, 238, 255, 0.72);
+      font-family: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+    }
+    #tSub.is-hidden { display: none; }
+    /* 淡入 + 轻微上浮：出现时能被眼角捕捉到，又不干扰读数 */
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(-3px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    body.is-on #toast { animation: toast-in 0.12s ease-out; }
+  </style>
+</head>
+<body>
+  <div id="wrap"><span id="toast"><span id="tMain"></span><span id="tSub" class="is-hidden"></span></span></div>
+  <script src="toast.js"></script>
+</body>
+</html>

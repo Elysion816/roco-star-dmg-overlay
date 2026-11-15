@@ -27,6 +27,13 @@ contextBridge.exposeInMainWorld('api', {
   togglePassthrough: () => ipcRenderer.invoke('win:toggle-passthrough'),
   close: () => ipcRenderer.invoke('win:close'),
 
+  /**
+   * 加成提示小窗（小条态按 Ctrl/Alt+↑↓ 时在主窗下方浮一条，不改主窗尺寸）。
+   * @param {{main:string, sub?:string, tone?:string, anchorX?:number, contentW?:number, durationMs?:number}} payload
+   */
+  showToast: payload => ipcRenderer.invoke('toast:show', payload),
+  hideToast: () => ipcRenderer.invoke('toast:hide'),
+
   /** 在线数据 */
   getOnlineData: () => ipcRenderer.invoke('data:online'),
   getDataStatus: () => ipcRenderer.invoke('data:status'),
