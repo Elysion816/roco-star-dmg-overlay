@@ -11,8 +11,8 @@
  *     仅挑选动态修正（特性/技能自适应）为空集的场景，保证两份实现口径一致。
  *  V3 斩杀线语义：命中层的前一层必打不死、命中层必打死、0..层上限伤害单调非递减
  *  V4 组合空间：600 = 30 性格(up≠down) × 20 加点(3 个不同键)，无重复
- *  V5 性能：2 攻方 × 3 档 × 600 组（冷启动）必须 < 100ms
- *  V6 场景默认值：攻击技能默认取威力最高、防御技能含「无」
+ *  V5 性能：3 攻方 × 3 档 × 20 组（180 次求解，冷启动）必须 < 100ms
+ *  V6 场景默认值：攻击技能默认取威力最高、防御技能含「无」与「聚能」、先手表键能对上数据包
  *
  * 运行：node tools/verify-core.mjs
  */
@@ -192,7 +192,11 @@ function indDamage(scene, combo, n) {
 // ===========================================================================
 section('[V3] 斩杀线语义（前一层打不死 / 该层打死 / 单调非递减）');
 {
-  const scene = domain.buildScene({ attackerId: '龙息帕尔', defenderId: '贝古斯', tierKey: 't1' });
+  // 靶子必须选「上限内确实打得死」的，否则两条最关键的断言（该层打死 / 前一层打不死）
+  // 一次都不会执行，本项会变成空转的绿灯。
+  // 龙息帕尔（物攻 127）→ 尖嘴狐仙（档①纯肉）在 10 层内仍打不死，故用暮星辰（魔攻向、威力 200）。
+  const scene = domain.buildScene({ attackerId: '暮星辰', defenderId: '尖嘴狐仙', tierKey: 't1' });
+  ok(!!scene, 'V3 场景构造失败（暮星辰 / 尖嘴狐仙 / t1）');
   let checked = 0, killed = 0;
   for (const comboIndex of [0, 55, 199, 260, 377, 500, 599]) {
     const combo = domain.COMBOS[comboIndex];
@@ -220,6 +224,8 @@ section('[V3] 斩杀线语义（前一层打不死 / 该层打死 / 单调非递
     }
     checked++;
   }
+  // 空转护栏：必须真的命中「可斩」分支，否则上面两条断言形同虚设
+  ok(killed > 0, 'V3 抽查的组合全部不可斩（' + killed + '/' + checked + '），语义断言没有执行到');
   console.log('  抽查 ' + checked + ' 个组合（其中可斩 ' + killed + ' 个），语义正确');
 
   // 「二次估计 + 局部验证」的快速求解必须与纯二分结果完全一致
@@ -396,12 +402,17 @@ section('[V5] 性能：3 攻方 × 3 档 × 20 组');
     const a1 = domain.cellResult(domain.buildScene({ attackerId: ATK1, defenderId: DEF, tierKey: 't1', natureKey: 'atk>matk', ivsKey: domain.CONFIG_IVS[0].ivsKey }), 10);
     const a2 = domain.cellResult(domain.buildScene({ attackerId: ATK1, defenderId: DEF, tierKey: 't1', natureKey: 'matk>atk', ivsKey: domain.CONFIG_IVS[1].ivsKey }), 10);
     ok(a1.layer !== a2.layer || a1.dmg !== a2.dmg, '不同配置算出了同一个结果（缓存键可能漏了配置维度）');
-    // 16 组枚举仍正确（参考面板用）
-    const all = domain.referenceAll(auto, 10);
+    // 20 组枚举仍正确（参考面板用）
+    //
+    // 层上限取 50 而不是 10：默认攻方打档①纯肉在 10 层内根本打不死，
+    // 最小值会恒为 Infinity，这条断言就变成永远通过的绿灯（也打印不出有意义的数字）。
+    const all = domain.referenceAll(auto, 50);
     ok(all && all.layers.length === 20, '20 组参考结果异常');
     let minL = Infinity;
     for (let i = 0; i < 20; i++) { const L = all.layers[i]; if (L >= 0 && L < minL) minL = L; }
-    console.log('  单格按配置求解 = 直接求解；20 组参考最小值 ' + (minL === Infinity ? '无' : minL) + ' 层');
+    ok(minL !== Infinity, '20 组参考在 50 层上限内全部不可斩，参考面板没有可用组合');
+    ok(all.killed >= 1 && all.killed <= 20, '20 组可斩计数异常：' + all.killed);
+    console.log('  单格按配置求解 = 直接求解；20 组参考最小值 ' + minL + ' 层（可斩 ' + all.killed + '/20）');
   }
 
   // 攻方加成：0 时与基线一致；攻击按百分比、威力按点数增长；夹紧与缓存隔离
@@ -480,6 +491,52 @@ section('[V6] 场景默认值');
   ok(defaultSkill.damage_class === '物攻', '龙息帕尔（物攻 127 / 魔攻 57）不应默认魔攻技能，实际 ' + defaultSkill.name + '/' + defaultSkill.damage_class);
   const defList = domain.getDefenderSkills(sprites['贝古斯']);
   ok(defList[0].id === '__none__', '防御技能列表第一项应为「无」');
+  // 「聚能」必须始终存在且在第二位（上游 getDefenseSkillOptions 同序）：
+  // 缺了它，SKILL_MODS 里 19 条按「应对状态」生效的修正永远走不到，斩杀层数会系统性偏高。
+  ok(defList[1].id === '__state__' && defList[1].category === '状态',
+    '防御技能列表第二项应为「聚能」（category=状态），实际 ' + (defList[1] && defList[1].id));
+  for (const name of Object.keys(sprites)) {
+    const l = domain.getDefenderSkills(sprites[name]);
+    if (!l.some(s => s.category === '状态')) { ok(false, '精灵 ' + name + ' 的防御列表缺少「聚能」'); break; }
+  }
+  ok(defList.filter(s => s.id === '__state__').length === 1, '「聚能」在防御列表里重复出现');
+
+  // 「聚能」必须真的触发「应对状态」分支：拿一个 3 倍威力的技能对比
+  {
+    const sp = sprites['水蓝蓝'] || null;
+    const sk = skills['突袭'] || null;
+    if (sp && sk) {
+      const mkDef = ds => ({
+        attacker: domain.leanSprite(sp), attackSkill: sk,
+        defender: domain.leanSprite(sprites['尖嘴狐仙']),
+        defenseSkill: ds, starLayer: 0,
+        attackerNature: { up: 'atk', down: 'matk' },
+        defenderNature: { up: 'hp', down: 'atk' },
+        attackerIVs: ['atk', 'hp', 'spd'], defenderIVs: ['hp', 'def', 'mdef'],
+        attackerBuff: { atk: 0, matk: 0 }, defenderBuff: { def: 0, mdef: 0 },
+        attackerPowerBoost: 0, attackerCombo: 0,
+      });
+      const plain = core.computeFinalDamage(mkDef(domain.NO_DEFENSE_SKILL));
+      const reacted = core.computeFinalDamage(mkDef(domain.STATE_DEFENSE_SKILL));
+      ok(reacted.skillDmg > plain.skillDmg * 2.5,
+        '「聚能」未触发应对状态加成：突袭 ' + plain.skillDmg + ' → ' + reacted.skillDmg + '（应约 3 倍）');
+      console.log('  防御列表含「聚能」；聚能触发应对状态：突袭 ' + plain.skillDmg + ' → ' + reacted.skillDmg);
+    }
+  }
+
+  // 先手表：上游遗留 id 与数据包的中文键必须都对得上，否则「必先手/必后手」全套失效
+  {
+    const dataKeys = Object.keys(skills);
+    const firstIds = Object.keys(core.FIRST_STRIKE_SKILLS);
+    const lastIds = Object.keys(core.LAST_STRIKE_SKILLS);
+    const hitFirst = firstIds.filter(k => dataKeys.indexOf(k) >= 0);
+    const hitLast = lastIds.filter(k => dataKeys.indexOf(k) >= 0);
+    ok(hitFirst.length > 0, 'FIRST_STRIKE_SKILLS 没有任何键能对上数据包技能键');
+    ok(hitLast.length > 0, 'LAST_STRIKE_SKILLS 没有任何键能对上数据包技能键');
+    ok(hitFirst.some(k => core.FIRST_STRIKE_SKILLS[k]) && hitFirst.every(k => core.FIRST_STRIKE_SKILLS[k] === true),
+      'FIRST_STRIKE_SKILLS 命中项的值应为 true');
+    console.log('  先手表命中数据包：先手 ' + hitFirst.join('/') + '　后手 ' + hitLast.join('/'));
+  }
   const scene = domain.buildScene({ attackerId: '龙息帕尔', defenderId: '贝古斯', tierKey: 't3' });
   ok(scene && scene.tier.key === 't3', 'buildScene 档位解析失败');
   const sc2 = domain.buildScene({ attackerId: '龙息帕尔', defenderId: '贝古斯', tierKey: 't1', natureKey: 'atk>spd', ivsKey: domain.ivsKeyOf(domain.CONFIG_IVS[0]) });

@@ -23,6 +23,14 @@
   --line: rgba(126, 160, 255, 0.20);
   --line-strong: rgba(126, 160, 255, 0.38);
 
+  /* 控件内嵌底：加成按钮 / 数值输入框 / 下拉等"卡片里的小方块"共用。
+     这三个变量原先被 .mod-btn / .mod-input 引用但从未定义，var() 无 fallback
+     会让整条声明失效（背景掉成透明、边框掉成 currentColor），
+     表现为展开态加成 ± 按钮与输入框没有深色底。 */
+  --panel-2: rgba(255, 255, 255, 0.07);
+  --panel-3: rgba(255, 255, 255, 0.12);
+  --line-2: rgba(126, 160, 255, 0.46);
+
   --radius: 10px;
   --mono: "Cascadia Mono", "Consolas", "SF Mono", ui-monospace, monospace;
 }
@@ -879,7 +887,10 @@ body.collapsed .wbtn-more { display: inline-flex; align-items: center; justify-c
 body.mini-menu-open #titlebar { -webkit-app-region: no-drag; }
 
 /* ---------------------------------------------------------------- 小条模式 */
-/* 窗口高度固定 46px：4 + 38 + 4 = 46，标题栏完整可见，按钮不会被裁切 */
+/* 窗口高度固定 46px = 标题栏 38px + 上下共 8px 的框体背景。
+   注意：#frame 的 padding 在本文件靠后（"小条更窄"那一段）被覆盖成 0，
+   所以这 8px 不是内边距，而是 #frame 自身背景露出来的高度——视觉上仍是一条实心 46px 条。
+   任何按"内边距 4px"推算落点坐标的代码都是错的。 */
 body.collapsed #frame { padding: 4px 6px; gap: 0; }
 body.collapsed #titlebar { height: 38px; }
 body.collapsed #content, body.collapsed #detail { display: none; }

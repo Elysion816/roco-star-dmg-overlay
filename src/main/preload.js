@@ -61,6 +61,15 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('mode', handler);
     return () => ipcRenderer.removeListener('mode', handler);
   },
+  /**
+   * 小条态的全局加成快捷键（主进程 globalShortcut 转发）。
+   * 焦点在游戏 / 别的窗口时也有效，payload = { key: 'atkPct'|'powerAdd', dir: 1|-1 }
+   */
+  onModsBump: cb => {
+    const handler = (_e, payload) => cb(payload);
+    ipcRenderer.on('mods:bump', handler);
+    return () => ipcRenderer.removeListener('mods:bump', handler);
+  },
 
   info: () => ipcRenderer.invoke('app:info'),
   openUrl: url => ipcRenderer.invoke('app:open-url', url),

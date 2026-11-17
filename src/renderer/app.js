@@ -14,6 +14,19 @@
 (function () {
   'use strict';
 
+  // 渲染层错误采集：全局 onerror / unhandledrejection 记到 window.__xyErrors，
+  // 供无头自检断言"这一次交互有没有抛异常"。
+  // 之所以需要它：很多 UI bug（例如读了不存在的字段）只表现为 console 里一条 TypeError，
+  // 界面照常渲染，靠截图 / DOM 快照完全看不出来。
+  window.__xyErrors = window.__xyErrors || [];
+  window.addEventListener('error', e => {
+    window.__xyErrors.push({ kind: 'error', message: String(e && e.message), at: (e && e.filename) + ':' + (e && e.lineno) });
+  });
+  window.addEventListener('unhandledrejection', e => {
+    const r = e && e.reason;
+    window.__xyErrors.push({ kind: 'rejection', message: String((r && r.message) || r) });
+  });
+
   const D = window.RocoDomain;
   const CORE = window.RocoCore;
   const api = window.api || null;
@@ -63,6 +76,12 @@
     focusRow: 'atk1',
     /** 最近一次加成提示的参数（小条态才弹；供调试钩子读，不影响业务） */
     lastToast: null,
+    /**
+     * 小条态全局加成快捷键是否真的抢到了（主进程 globalShortcut 的结果）。
+     * true 时 DOM 键盘路径必须让位，否则「窗口有焦点」的情况下同一次按键
+     * 会被全局快捷键和 DOM keydown 各处理一遍，加成一次跳两档。
+     */
+    globalMods: { atkPct: false, powerAdd: false },
   };
 
   const ROWS = ['atk1', 'atk2', 'atk3'];
@@ -528,7 +547,10 @@
     const defSprite = spriteOf('def');
     const defSel = document.querySelector('.skill-select[data-slot="def"]');
     defSel.innerHTML = D.getDefenderSkills(defSprite).map(s => {
-      const red = s.reduction != null ? ' · 减伤' + Math.round((1 - s.reduction) * 100) + '%' : '';
+      // 「聚能」是伪技能（category='状态'），作用是让攻方的「应对状态：」分支生效，没有减伤
+      const red = s.id === '__state__'
+        ? ' · 触发应对状态'
+        : (s.reduction != null ? ' · 减伤' + Math.round((1 - s.reduction) * 100) + '%' : '');
       return '<option value="' + esc(s.id) + '">' + esc(s.name) + red + '</option>';
     }).join('');
     defSel.value = ui.skills.def || '__none__';
@@ -730,7 +752,10 @@
     const note = $('#gridNote');
     // 只有「9 格全部真正重算」的耗时才算「全量」；命中缓存 / 半量重算都不覆盖。
     // 多次采样取最小值：一次测量可能正好撞上系统其它进程占 CPU，最小值更接近稳态。
-    if (grid && grid.cold === 6 && grid.ms > 2) {
+    // 9 格 = 3 攻方 × 3 档；只有全部真算（cold === 9）才是「全量」。
+    // 原来写成 6（早期 2 攻方 × 3 档的口径残留），导致换靶子/换层上限这类
+    // 全冷场景反而不满足条件，只有"改了两行攻方"的 6 冷 3 热才命中，等于低估成本。
+    if (grid && grid.cold === ROWS.length * D.DEFENDER_TIERS.length && grid.ms > 2) {
       view.lastFullMs = view.lastFullMs ? Math.min(view.lastFullMs, grid.ms) : grid.ms;
     }
     const ms = (view.lastFullMs || (grid ? grid.ms : 0)).toFixed(0);
@@ -743,7 +768,7 @@
         if (L === null) continue;
         if (!best || L < best.L) best = { L, row: c.row, tier: c.tier };
       }
-      if (!best) return '当前 ' + ui.maxLayer + ' 层上限内两只攻方都无法斩杀任何档位（全部显示 ' + overLayerText() + '）';
+      if (!best) return '当前 ' + ui.maxLayer + ' 层上限内所有攻方都无法斩杀任何档位（全部显示 ' + overLayerText() + '）';
       return '最快：' + SLOT_NAME[best.row] + ' × ' + best.tier.label + ' → ' + best.L + ' 层';
     })();
     note.innerHTML = '<span>' + esc(killText) + '</span>' +
@@ -1099,7 +1124,10 @@
 
   /**
    * 明细行模型：20 组参考结果（点格子时才计算），并标出"当前配置"那一行。
-   * 行 = { idx, key, natureLabel, ivsLabel, ivsArr, up, layer, pct0, dmg, current }
+   * 行 = { idx, key, natureLabel, ivsLabel, ivsArr, up, layer, pct0, dmg, dmg0, current, manual }
+   *
+   * dmg  = 命中层的伤害（打不死时是上限层的伤害）
+   * dmg0 = 0 层伤害，与 pct0 同源（pct0 = dmg0 / defHP × 100）
    */
   function detailRows(entry) {
     if (!entry || !entry.scene) return [];
@@ -1122,7 +1150,11 @@
         layer: all.layers[i] === D.NO_KILL ? null : all.layers[i],
         pct0: all.pct0[i],
         dmg: all.dmg[i],
+        dmg0: all.dmg0[i],
         current: cfg.natureKey === cur.natureKey && cfg.ivsKey === cur.ivsKey,
+        // 20 组参考里没有"手动指定"的概念（那 20 组合本来就是这个面板的全部候选），
+        // 保留字段是为了让 footText 的前缀逻辑不必再判断 undefined。
+        manual: false,
       };
     });
   }
@@ -1194,13 +1226,23 @@
     });
   }
 
+  /**
+   * 明细面板底部详情条。
+   *
+   * 三个数值必须分清（之前混用同一个 row.dmg，并且读了一个不存在的 entry.cell.all）：
+   *   row.dmg0 —— 0 层星陨时的伤害，与 row.pct0 同源
+   *   row.dmg  —— 命中层的伤害（不可斩时是上限层的伤害）
+   *   defHP    —— 靶子最终生命，来自 cellResult() 的顶层字段（不是 cell.all.defHP）
+   */
   function footText(entry, index) {
     const row = detailRows(entry).filter(r => r.idx === index)[0];
     if (!row) return '点击任意组合查看该组合详情';
     const L = row.layer === null ? '上限内不可斩（' + overLayerText() + '）' : row.layer + ' 层';
+    const defHP = (entry.cell && entry.cell.defHP) || 0;
+    const hitLabel = row.layer === null ? '上限层伤害' : row.layer + ' 层伤害';
     return (row.manual ? '[手动] ' : '[' + row.key + '] ') + row.natureLabel + ' · ' + row.ivsLabel + ' → ' + L +
-      '　0层伤害 ' + row.dmg + '（' + D.formatPct(row.pct0) + '）' +
-      '　选中层伤害 ' + row.dmg + ' / ' + entry.cell.all.defHP;
+      '　0 层伤害 ' + row.dmg0 + '（' + D.formatPct(row.pct0) + '）' +
+      '　' + hitLabel + ' ' + row.dmg + ' / ' + defHP;
   }
 
   function groupsHTML(entry) {
@@ -1294,6 +1336,16 @@
     return false;
   }
 
+  /**
+   * 该加成键是否已由主进程的全局快捷键接管。
+   *
+   * 只在「小条态 + 确实注册成功」时为真：展开态主进程会注销全局键，
+   * 此时 DOM 路径必须继续工作，否则展开后快捷键会整段失灵。
+   */
+  function globalModShortcutActive(key) {
+    return !!(view.collapsed && view.globalMods && view.globalMods[key]);
+  }
+
   /** 精灵选择器 / 小条菜单 / ⋯ 菜单打开时，焦点快捷键整体让位（那里要用 Tab / ↑↓ 选精灵） */
   function overlaysOpen() {
     const pickerEl = $('#picker');
@@ -1328,12 +1380,16 @@
     if (key === 'ArrowUp' || key === 'ArrowDown') {
       if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
         e.preventDefault();
+        // 小条态且全局快捷键已抢到：让位给主进程，否则同一次按键会被处理两遍
+        // （一次跳两档）。这里仍 preventDefault，避免输入框的原生 ArrowUp 递增。
+        if (globalModShortcutActive('atkPct')) return true;
         bumpMod(modRow, 'atkPct', (key === 'ArrowUp' ? 1 : -1) * HOTKEY_ATK_STEP);
         return true;
       }
       // Alt+↑↓：威力加成（威力点数）
       if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         e.preventDefault();
+        if (globalModShortcutActive('powerAdd')) return true;
         bumpMod(modRow, 'powerAdd', (key === 'ArrowUp' ? 1 : -1) * HOTKEY_POWER_STEP);
         return true;
       }
@@ -1555,8 +1611,10 @@
         else { renderMiniMenu(); syncMiniMenuHeight(); }
       });
       miniSearchInput.addEventListener('keydown', e => {
-        if (e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); moveMiniCursor(1); }
-        else if (e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); moveMiniCursor(-1); }
+        // 带 Ctrl/Alt 的方向键是「调加成」，不能同时移动候选列表
+        const plainArrow = !e.ctrlKey && !e.altKey && !e.metaKey;
+        if (e.key === 'ArrowDown' && plainArrow) { e.preventDefault(); e.stopPropagation(); moveMiniCursor(1); }
+        else if (e.key === 'ArrowUp' && plainArrow) { e.preventDefault(); e.stopPropagation(); moveMiniCursor(-1); }
         else if (e.key === 'Enter') {
           e.preventDefault(); e.stopPropagation();
           const item = miniMenu.items[miniMenu.cursor];
@@ -1748,6 +1806,23 @@
         applyMode(mode);
       });
       if (api.onMiniMenuClose) api.onMiniMenuClose(() => closeMiniMenu(false));
+      /**
+       * 小条态的全局加成快捷键（主进程 globalShortcut → 这里）。
+       *
+       * 焦点在别处时没有 e.target，作用行只能取 view.focusRow
+       * ——这正好是小条里那个带高亮的攻方，Tab / ↑↓ 选好之后切到游戏里调即可。
+       * 加成提示照常弹（小条态 showModToast 会工作），焦点不在浮窗也能看到反馈。
+       */
+      if (api.onModsBump) {
+        api.onModsBump(payload => {
+          if (!payload || !payload.key) return;
+          const key = payload.key;
+          const dir = Number(payload.dir) < 0 ? -1 : 1;
+          const step = key === 'atkPct' ? HOTKEY_ATK_STEP : HOTKEY_POWER_STEP;
+          const row = ROWS.indexOf(view.focusRow) >= 0 ? view.focusRow : ROWS[0];
+          bumpMod(row, key, dir * step);
+        });
+      }
       api.onOnlineData(payload => applyOnlineData(payload, 'online'));
       api.onDataStatus(st => {
         const tag = $('#dataTag');
@@ -1816,6 +1891,10 @@
     if (!mode) return;
     view.collapsed = !!mode.collapsed;
     view.passthrough = !!mode.passthrough;
+    // 主进程只在注册成功时置真；展开态它一定是 false（会主动注销）
+    if (mode.globalMods) {
+      view.globalMods = { atkPct: !!mode.globalMods.atkPct, powerAdd: !!mode.globalMods.powerAdd };
+    }
     document.body.classList.toggle('collapsed', view.collapsed);
     // 展开态不该留着小菜单（窗口尺寸已由主进程接管，这里只隐藏）
     if (!view.collapsed && miniMenu.open) closeMiniMenu(false);

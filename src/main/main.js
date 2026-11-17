@@ -168,6 +168,30 @@ let collapsed = false;
 let onlineData = null;
 let dataStatus = { source: 'builtin', fetchedAt: 0, message: '内置数据' };
 
+/**
+ * 小条态专用的「全局」加成快捷键注册结果。
+ *
+ * 为什么需要全局快捷键：小条只有 46px，用户真正在用它的时候焦点多半在游戏里。
+ * DOM keydown 只在窗口持有焦点时才会到达渲染进程，焦点在别处时 Ctrl/Alt+↑↓
+ * 根本传不进来——所以这一组必须走 globalShortcut。
+ *
+ * 为什么只在小条态注册：Ctrl+↑↓ / Alt+↑↓ 是其它应用里常见的组合键
+ * （浏览器滚动、资源管理器上一级目录等）。全局注册等于把它们从系统手里抢走，
+ * 所以一展开面板就立刻注销，把副作用限制在「小条确实存在」的那段时间里。
+ *
+ * 兼容性：任何一组因被占用而注册失败，都只降级不报错——
+ * 渲染层仍保留 DOM 路径兜底（小条接管鼠标且窗口有焦点时照样能调）。
+ */
+const globalMods = { atkPct: false, powerAdd: false };
+
+/** [accelerator, 加成键, 方向]：攻击加成按百分比，威力加成按点数（步进在渲染层） */
+const MINI_MOD_SHORTCUTS = [
+  ['Control+Up', 'atkPct', 1],
+  ['Control+Down', 'atkPct', -1],
+  ['Alt+Up', 'powerAdd', 1],
+  ['Alt+Down', 'powerAdd', -1],
+];
+
 // ---- 加成提示小窗的状态 ----
 /** 提示窗的 BrowserWindow（懒创建、常驻复用；隐藏时不销毁，避免反复创建开销） */
 let toastWin = null;
@@ -259,7 +283,13 @@ function createWindow() {
   if (DIAG) runDiag();
   if (process.env.XY_SMOKE === '1') {
     win.webContents.once('did-finish-load', () => {
-      setTimeout(() => require('./smoke.js').run(win, app, ROOT), 1500);
+      setTimeout(() => {
+        console.log('[main] smoke 即将开始');
+        require('./smoke.js').run(win, app, ROOT).catch(e => {
+          console.error('[main] smoke 同步抛错：', e && e.stack || e);
+          app.exit(1);
+        });
+      }, 1500);
     });
   }
 
@@ -418,6 +448,11 @@ function setCollapsed(on) {
   if (next && !collapsed && passthrough) setPassthrough(false); // 收条前先接管鼠标
   if (!next) setPassthrough(false);                              // 展开后一律接管：用户点「展开」就是要马上能操作
   collapsed = next;
+  // 全局加成快捷键的注册/注销放在**第一次 sendMode 之前**：
+  // 渲染层要靠 mode.globalMods 决定 DOM 键盘路径是否让位，
+  // 晚于 sendMode 会出现「已收成小条、但渲染层还以为该自己处理按键」的短暂错位。
+  if (collapsed) registerMiniModShortcuts();
+  else unregisterMiniModShortcuts();
   // 先把 collapsed 语义发给渲染层（让它立刻切到小条布局），再改窗口尺寸，
   // 否则缩放瞬间合成器可能残留上一帧（右侧/底部白块）
   sendMode();
@@ -638,6 +673,8 @@ function sendMode() {
     collapsed,
     visible: win.isVisible(),
     alwaysOnTop: win.isAlwaysOnTop(),
+    // 小条态的全局加成快捷键是否真的抢到了（false = 被其它程序占用）
+    globalMods: { atkPct: globalMods.atkPct, powerAdd: globalMods.powerAdd },
   });
 }
 
@@ -650,6 +687,63 @@ function hotkeyToggleFocus() {
   if (!win.isVisible()) win.show();
   if (passthrough) setPassthrough(false);
   else setPassthrough(true);
+}
+
+/**
+ * 把一次加成调整交给渲染层执行。
+ *
+ * 主进程不做数值计算（它连 RocoDomain 都没 require），只负责转达
+ * 「哪个加成、往哪个方向」；步进、夹紧、重算、落盘全部留在渲染层，
+ * 避免同一套夹紧逻辑在两处各写一份。
+ */
+function dispatchModBump(key, dir) {
+  if (!win || win.isDestroyed()) return false;
+  // 双保险：只在真正的小条态转达（注销是异步生效的，防御一次窗口状态变化）
+  if (!collapsed) return false;
+  win.webContents.send('mods:bump', { key, dir, via: 'global' });
+  return true;
+}
+
+/**
+ * 注册小条态的全局加成快捷键。进入小条时调用。
+ * 单条失败只降级该条，不影响其余，也不抛错。
+ */
+function registerMiniModShortcuts() {
+  for (const [acc, key, dir] of MINI_MOD_SHORTCUTS) {
+    try {
+      if (globalShortcut.isRegistered(acc)) {
+        // 已被自己或别人占用：不重复注册，但按失败处理（渲染层会保留 DOM 路径）
+        console.warn('[main] 全局加成快捷键已被占用，跳过：' + acc);
+        continue;
+      }
+      const ok = globalShortcut.register(acc, () => dispatchModBump(key, dir));
+      if (ok) {
+        // 同一组（atkPct / powerAdd）只要有一个方向成功就算「这组可用」
+        globalMods[key] = true;
+      } else {
+        console.warn('[main] 全局加成快捷键注册失败（可能被占用）：' + acc);
+      }
+    } catch (e) {
+      console.warn('[main] 全局加成快捷键异常：' + acc + ' ' + e.message);
+    }
+  }
+}
+
+/** 注销小条态的全局加成快捷键。展开 / 退出时调用，把组合键还给系统。 */
+function unregisterMiniModShortcuts() {
+  let changed = false;
+  for (const [acc] of MINI_MOD_SHORTCUTS) {
+    try {
+      if (globalShortcut.isRegistered(acc)) {
+        globalShortcut.unregister(acc);
+        changed = true;
+      }
+    } catch (e) { /* 忽略 */ }
+  }
+  if (globalMods.atkPct || globalMods.powerAdd) changed = true;
+  globalMods.atkPct = false;
+  globalMods.powerAdd = false;
+  return changed;
 }
 
 function registerShortcuts() {
@@ -842,6 +936,22 @@ function registerIPC() {
 // ---------------------------------------------------------------------------
 // 生命周期
 // ---------------------------------------------------------------------------
+// 自检隔离：XY_SMOKE 的流程会把窗口拖到 1300 / 670 宽、又把小条高度设成 46，
+// 这些都会经 persistBounds → saveState 写进 %APPDATA%/星陨斩杀线/state.json，
+// 等于「跑一次自检就改掉用户下次启动的窗口位置与尺寸」。
+// 必须在 loadState() 之前改 userData，让自检读到/写到独立的临时目录。
+// XY_SMOKE_KEEP_STATE=1 可保留该目录，便于排查（默认跑完即弃）。
+if (process.env.XY_SMOKE === '1') {
+  const os = require('node:os');
+  const smokeUserData = path.join(os.tmpdir(), 'xingyun-smoke-' + process.pid);
+  try { fs.mkdirSync(smokeUserData, { recursive: true }); } catch (e) { /* 忽略 */ }
+  app.setPath('userData', smokeUserData);
+  if (process.env.XY_SMOKE_KEEP_STATE !== '1') {
+    app.on('will-quit', () => { try { fs.rmSync(smokeUserData, { recursive: true, force: true }); } catch (e) { /* 忽略 */ } });
+  }
+  console.log('[main] 自检隔离 userData：' + smokeUserData);
+}
+
 loadState();
 
 if (!app.requestSingleInstanceLock()) {
@@ -862,6 +972,8 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('will-quit', () => {
     globalShortcut.unregisterAll();
+    globalMods.atkPct = false;
+    globalMods.powerAdd = false;
     if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
     if (toastWin && !toastWin.isDestroyed()) { try { toastWin.destroy(); } catch (e) { /* 忽略 */ } }
     saveState(true);

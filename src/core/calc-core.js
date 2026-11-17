@@ -14,6 +14,7 @@
 // 说明：段 G（getBuff）不在原始清单里，但 SKILL_MODS 内部（如星际粉尘/和弦共振）
 // 会读取攻击方/防御方的属性 buff 百分比，缺它会在运行期抛 ReferenceError，故一并抽出。
 // 浮窗不使用属性 buff，shim 里把两侧 buff 固定为 0。
+// 段 E 之后另有一段生成器注入的「先手表键映射」补丁（见 STRIKE_ALIASES）。
 // ===========================================================================
 
 /* eslint-disable */
@@ -971,6 +972,17 @@ function computeFinalDamage(ctx) {
     powerBoost, attackerCombo, hasCombo
   };
 }
+
+// ===================== 补丁：先手表键映射（生成器注入，未改上游抽取段）=====================
+// 上游用 skill_000654 这类遗留 id 作键，数据包的键是中文技能名（skill_ 前缀 0 条），
+// 不补这一层，isFirstStrike() 的 firstStrike / lastStrike 恒为 false。
+// 原键保留（上游语义不变），另按技能名补入数据包实际使用的键。
+const STRIKE_ALIASES = {
+  first: ["俯冲","先发制人","天旋地转"],
+  last: ["后发制人"],
+};
+for (const name of STRIKE_ALIASES.first) FIRST_STRIKE_SKILLS[name] = true;
+for (const name of STRIKE_ALIASES.last) LAST_STRIKE_SKILLS[name] = true;
 
 // ===================== 导出（Node require / 浏览器 <script> 双通道）=====================
 const RocoCore = {

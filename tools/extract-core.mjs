@@ -33,6 +33,22 @@ const RANGES = [
   { id: 'F', label: 'computeFinalDamage', start: 3948, end: 4051, expectStart: /^function computeFinalDamage/, expectLast: /^\}$/ },
 ];
 
+/**
+ * 先手表键映射补丁（生成器注入，不改动上游抽取段本身）。
+ *
+ * 上游 FIRST_STRIKE_SKILLS / LAST_STRIKE_SKILLS 用的是「skill_000654」这类遗留 id，
+ * 而 datas/final/skills.json 的键是中文技能名（实测 824 条里 skill_ 前缀键数 = 0）。
+ * 于是 isFirstStrike() 里的 firstStrike / lastStrike 恒为 false，
+ * 「必先手 / 必后手」整套机制退化成纯比速度（顺风 / 破空 / 扇风 / 疾风刺 / 展翅 受影响）。
+ *
+ * 这里保留上游原键（语义不变），再按技能名把数据包实际使用的键补进同一对象。
+ * 生成前会校验每个名字都在数据里存在——数据漂移时 extract 直接失败，不会静默注入死键。
+ */
+const STRIKE_ALIASES = {
+  first: ['俯冲', '先发制人', '天旋地转'],
+  last: ['后发制人'],
+};
+
 /** 生成文件必须包含的符号 */
 const REQUIRED_SYMBOLS = [
   'computeFinalDamage', 'computeSkillDynamicModifiers', 'SKILL_MODS', 'effectiveness',
@@ -99,6 +115,7 @@ const header = [
   '// 说明：段 G（getBuff）不在原始清单里，但 SKILL_MODS 内部（如星际粉尘/和弦共振）',
   '// 会读取攻击方/防御方的属性 buff 百分比，缺它会在运行期抛 ReferenceError，故一并抽出。',
   '// 浮窗不使用属性 buff，shim 里把两侧 buff 固定为 0。',
+  '// 段 E 之后另有一段生成器注入的「先手表键映射」补丁（见 STRIKE_ALIASES）。',
   '// ===========================================================================',
   '',
   '/* eslint-disable */',
@@ -130,9 +147,35 @@ const header = [
   '',
 ].join('\n');
 
+// 先手表映射的锚点校验：名字必须在数据包 skills.json 里真实存在
+{
+  const skillsPath = path.join(DATA_DIR, 'skills.json');
+  if (!fs.existsSync(skillsPath)) fail('先手表补丁找不到数据文件：' + skillsPath);
+  const skillKeys = JSON.parse(fs.readFileSync(skillsPath, 'utf8'));
+  for (const name of [...STRIKE_ALIASES.first, ...STRIKE_ALIASES.last]) {
+    if (!skillKeys[name]) fail('先手表补丁的技能在数据里不存在：' + name);
+  }
+}
+
 const body = segments
   .map(s => '\n// ===================== 段 ' + s.id + '：' + s.label + '（上游 ' + s.start + '-' + s.end + '）=====================\n' + s.body + '\n')
   .join('\n');
+
+// 补丁段必须排在段 E 之后：FIRST_STRIKE_SKILLS / LAST_STRIKE_SKILLS 在那里声明
+const strikePatch = [
+  '',
+  '// ===================== 补丁：先手表键映射（生成器注入，未改上游抽取段）=====================',
+  '// 上游用 skill_000654 这类遗留 id 作键，数据包的键是中文技能名（skill_ 前缀 0 条），',
+  '// 不补这一层，isFirstStrike() 的 firstStrike / lastStrike 恒为 false。',
+  '// 原键保留（上游语义不变），另按技能名补入数据包实际使用的键。',
+  'const STRIKE_ALIASES = {',
+  '  first: ' + JSON.stringify(STRIKE_ALIASES.first) + ',',
+  '  last: ' + JSON.stringify(STRIKE_ALIASES.last) + ',',
+  '};',
+  'for (const name of STRIKE_ALIASES.first) FIRST_STRIKE_SKILLS[name] = true;',
+  'for (const name of STRIKE_ALIASES.last) LAST_STRIKE_SKILLS[name] = true;',
+  '',
+].join('\n');
 
 const footer = [
   '',
@@ -145,7 +188,7 @@ const footer = [
   '',
 ].join('\n');
 
-const code = header + body + footer;
+const code = header + body + strikePatch + footer;
 
 // ---------------------------------------------------------------------------
 // 4. 自检（符号 + vm 加载 + 真实数据跑通）

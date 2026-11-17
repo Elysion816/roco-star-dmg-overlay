@@ -194,6 +194,19 @@
 
   /** 防御技能的「无」占位 */
   const NO_DEFENSE_SKILL = Object.freeze({ id: '__none__', name: '无', reduction: 1, _pseudo: true });
+  /**
+   * 防御技能的「聚能」占位：上游 getDefenseSkillOptions 里始终跟在「无」之后。
+   * 它的 category === '状态'，用来让攻击方触发「应对状态：」类技能（41 个攻击技能 + 愿力冲击）。
+   * 缺了它，SKILL_MODS 里 19 条按「应对状态」分支生效的修正永远走不到，
+   * 斩杀层数会系统性偏高。reduction 与上游保持一致（不填，等价 1）。
+   */
+  const STATE_DEFENSE_SKILL = Object.freeze({
+    id: '__state__',
+    name: '聚能',
+    category: '状态',
+    desc: '用于使攻击方能够应对状态。',
+    _pseudo: true,
+  });
 
   // ---------------------------------------------------------------------------
   // 数据查询
@@ -261,9 +274,9 @@
     return out;
   }
 
-  /** 防御技能列表：前缀「无」+ 该精灵 skills 里 category==='防御' */
+  /** 防御技能列表：前缀「无」+「聚能」+ 该精灵 skills 里 category==='防御' */
   function getDefenderSkills(sprite) {
-    const out = [NO_DEFENSE_SKILL];
+    const out = [NO_DEFENSE_SKILL, STATE_DEFENSE_SKILL];
     if (!sprite) return out;
     for (const sid of sprite.skills || []) {
       const sk = SKILLS[sid];
@@ -757,7 +770,7 @@
   const api = {
     // 常量
     STAT_KEYS, STAT_LABELS, STAT_SHORT, DEFAULT_MAX_LAYER, HARD_MAX_LAYER, NO_KILL,
-    NATURES, IVS_LIST, COMBOS, DEFENDER_TIERS, NO_DEFENSE_SKILL,
+    NATURES, IVS_LIST, COMBOS, DEFENDER_TIERS, NO_DEFENSE_SKILL, STATE_DEFENSE_SKILL,
     CONFIG_NATURES, CONFIG_IVS, CONFIGS, getConfigs16, shortNatureLabel, fullNatureLabel,
     ATK_PCT_MIN, ATK_PCT_MAX, POWER_ADD_MIN, POWER_ADD_MAX, ATK_PCT_STEP, POWER_ADD_STEP,
     MOD_MIN: ATK_PCT_MIN, MOD_MAX: ATK_PCT_MAX,
