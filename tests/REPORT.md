@@ -1,6 +1,6 @@
 # 数值对拍报告（上游 oracle vs calc-core）
 
-- 生成时间：2026-10-24T16:48:16.067Z
+- 生成时间：2026-11-17T16:21:05.776Z
 - 被测量：src/core/calc-core.js · computeFinalDamage(ctx)
 - 权威源：_intermediates/upstream/calculator.html 页面内 computeFinalDamage（CDP 实测）
 - 数据源：_intermediates/upstream/datas/final/*.json（622 精灵 / 824 技能 / 18 系）

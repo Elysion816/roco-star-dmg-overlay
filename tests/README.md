@@ -40,6 +40,9 @@ QA 严过关（Yan）· 2026-10-24
     # 5) 只看 JSON 摘要（CI 友好，失败时退出码 1）
     node tests/compare-core.mjs --json
 
+    # 6) 对拍但不重写 REPORT.md
+    node tests/compare-core.mjs --no-report
+
 ## fixtures.json 结构
 
     meta   : 生成时间、oracle 页面与上游 git 版本、靶子三档定义、攻方 profile、
@@ -79,6 +82,17 @@ req 与 LEAD-SPEC 第 2 节 ctx 一一对应：
 上游 YUANLI_SKILLS 定义在 calculator.js 890-905 行，**不在 LEAD-SPEC 第 2 节的抽取行段 A-F 内**，
 所以 calc-core.js 里没有它。对拍脚本按上游定义复刻了 18 个 __yuanli_<元素>__ 技能对象再传给 core
 （tests/compare-core.mjs 的 buildYuanliSkills）。若产品 UI 也要支持愿力冲击，domain.js/app.js 需要自行构造同样的对象。
+
+## 不在对拍范围：domain.js 的口径层
+
+本目录只对拍 `calc-core.computeFinalDamage(ctx)` 的四个字段（finalDamage / skillDmg / starDmg / defHP），
+期望值全部来自上游页面。`domain.js` 这一层（防御技能列表与「聚能」伪技能、20 组枚举、斩杀线求解）
+不产生新的期望值，由 `npm run verify` 的 V3/V4/V5/V6 覆盖：
+
+- 「聚能」（`__state__`，`category='状态'`）与「无」（`__none__`）只是把 ctx 里的 defenseSkill 换成对应对象，
+  公式本身没有分支变化；fixtures 里已有 5 组 `__state__` 用例，因此防御下拉的口径变化不会让 48 组期望值失效。
+- 先手表键映射（`FIRST_STRIKE_SKILLS` / `LAST_STRIKE_SKILLS` 的中文名补丁）只影响「必先手 / 必后手」，
+  fixtures 不含俯冲 / 先发制人 / 天旋地转 / 后发制人，故该补丁同样不改变对拍结果。
 
 ## 纪律
 

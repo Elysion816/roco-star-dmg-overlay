@@ -3,6 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/Elysion816/roco-star-dmg-overlay?label=release)](https://github.com/Elysion816/roco-star-dmg-overlay/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Elysion816/roco-star-dmg-overlay/total)](https://github.com/Elysion816/roco-star-dmg-overlay/releases)
 [![License](https://img.shields.io/github/license/Elysion816/roco-star-dmg-overlay)](LICENSE)
+[![Changelog](https://img.shields.io/badge/changelog-CHANGELOG.md-2f81f7)](CHANGELOG.md)
 
 > **本项目基于 [Bartzh/roco-star-dmg](https://github.com/Bartzh/roco-star-dmg) 开发。**
 > 
@@ -28,6 +29,7 @@
 - 三档靶子固定（纯肉 / 防血能力值 / 仅血量能力值），不用每次自己调性格与加点，直接横向对比三只攻方的斩杀线。
 - 第三个攻方槽位是 **多维手**：默认锁定「多维击打」（幻系 15 威力，每层星陨 +1 连击，幻系不引爆星陨）。
 - 每只攻方各有一个 **攻击加成**（百分比）与 **威力加成**（数值点数）输入，用来贴合游戏里的实际 buff。
+- 收成 46px 小条后，两组加成键（`Ctrl+↑↓` / `Alt+↑↓`）**升级为全局快捷键**：焦点在游戏里也能调，不必先切回浮窗。
 - 数据每次启动自动从 stardmg.top 拉取最新图鉴，失败自动用内置离线包。
 
 ---
@@ -45,6 +47,10 @@ roco-star-dmg-overlay-v1.0.4-win32-x64.7z     （约 63 MB，需 7-Zip / Bandizi
 
 > Release 资产名使用 ASCII：GitHub 上传接口会丢掉文件名里的非 ASCII 前缀。
 > 解压出来的目录仍然是 `星陨斩杀线-win32-x64/`，里面就是 `星陨斩杀线.exe`。
+>
+> **版本状态**：最近一次 Release 是 **v1.0.4（2026-11-15）**；`main` 上已包含 **v1.0.5** 的未出包改动
+> （小条态全局加成键、「聚能」防御口径、先手表修复、明细底部条修复等），逐条见 [CHANGELOG.md](CHANGELOG.md)。
+> 想立刻用上这些改动可从源码运行（方式 B），或等 v1.0.5 的绿色包。
 
 解压后双击里面的 **`星陨斩杀线.exe`** 即可运行。
 
@@ -89,15 +95,15 @@ npm start       # 已内置 tools/start.mjs：会先清掉 ELECTRON_RUN_AS_NODE 
 | `Esc` | 按「小条菜单 → 精灵选择器 → 明细面板」的顺序逐层关闭；都关着时「交还鼠标，回到穿透」 |
 | `Tab` / `Shift+Tab` | 选中下一个 / 上一个**攻方卡片**（攻① → 攻② → 多维手 → 回环；也可直接点击卡片） |
 | `↑` / `↓` | 在三个攻方之间上下移动选中（到底不出界） |
-| `Ctrl+↑` / `Ctrl+↓` | 调**当前选中攻方**的攻击加成 **±50%**（范围 −100% ~ +300%） |
-| `Alt+↑` / `Alt+↓` | 调**当前选中攻方**的威力加成 **±20 威力点**（范围 −100 ~ +300） |
+| `Ctrl+↑` / `Ctrl+↓` | 调**当前选中攻方**的攻击加成 **±50%**（范围 −100% ~ +300%）<br>收成小条后升级为**全局快捷键**：鼠标焦点在游戏或别的窗口时也生效 |
+| `Alt+↑` / `Alt+↓` | 调**当前选中攻方**的威力加成 **±20 威力点**（范围 −100 ~ +300）<br>小条态下同样是**全局快捷键** |
 | 托盘图标 | 左键＝呼出/接管；右键＝显示/隐藏、穿透、小条、重新拉取数据、打开数据目录、退出 |
 
 启动后默认 **接管鼠标**（可以直接点浮窗）。不想挡游戏操作时按 `Alt+X` 或 `Ctrl+Alt+T` 交还鼠标（点击穿透），
 再按一次收回；操作完也可以按 `Esc` 交还。
 
-> 穿透状态下窗口不接收键盘和点击（Windows `setIgnoreMouseEvents` 的语义），
-> 只能用全局快捷键或托盘唤回。
+> 穿透状态下窗口不接收键盘和点击（Windows `setIgnoreMouseEvents` 的语义）；
+> 此时**小条态的加成键**（全局快捷键）与 `Alt+X` / `Ctrl+Alt+T` / 托盘仍然可用。
 
 > 收起小条与展开都会**强制回到接管态**：46px 的条如果还在穿透，点了没反应会让人以为坏了；
 > 展开后若仍是穿透，等于「展开了却不能点」。要交还鼠标请按 `Esc` / `Alt+X` / `Ctrl+Alt+T`。
@@ -107,7 +113,9 @@ npm start       # 已内置 tools/start.mjs：会先清掉 ELECTRON_RUN_AS_NODE 
 ## 5. 界面说明
 
 1. **标题栏**：★ 星陨斩杀线 · 数据来源（内置数据 / 在线数据）· ⌘ 快捷键一览 · 穿透状态（按钮显示「穿透」或「接管中」）· 收起 · 关闭。整条可拖动移动窗口。
-   点 ⌘ 展开**快捷键面板**（键帽样式列出 Alt+X / Ctrl+Alt+T / Ctrl+Shift+M / Esc 四条）。
+   点 ⌘ 展开**快捷键面板**（键帽样式列出 9 条：Alt+X / Ctrl+Alt+T / Ctrl+Shift+M / Esc
+   + Tab/Shift+Tab 换攻方 + ↑↓ 移动 + Ctrl+↑↓ 攻击加成 + Alt+↑↓ 威力加成
+   + 小条态加成键升级为全局快捷键的说明）。
 2. **攻方① / 攻方② / 多维手（攻③）**
    - 点精灵按钮弹出选择器：**先按属性筛选，再点选**；也能直接输入名字 / 全拼 / 首字母 / 图鉴号
      （`lxpe` → 龙息帕尔，`1` → 图鉴号 1）。
@@ -121,15 +129,19 @@ npm start       # 已内置 tools/start.mjs：会先清掉 ELECTRON_RUN_AS_NODE 
    - **卡片选中态**：标题左边一条金色竖线 + 金色描边表示「当前选中」，键盘快捷键作用于它。
      点卡片任意位置即可选中；`Tab` / `Shift+Tab` 循环，`↑` / `↓` 上下移动。
    - **攻击加成**：百分比，范围 −100% ~ +300%，按钮步进 ±50%，也可直接输入任意整数。
-     键盘：`Ctrl+↑` / `Ctrl+↓` 同样 ±50%，作用于当前选中攻方（输入框里按键时作用于该输入框所在行）。
+     键盘：`Ctrl+↑` / `Ctrl+↓` 同样 ±50%，作用于当前选中攻方（输入框里按键时作用于该输入框所在行）；
+     **小条态下这两个键是全局快捷键**（见「小条模式」）。
      进内核的 `attackerBuff`，按百分比放大攻方的攻击/魔攻终值。
    - **威力加成**：**数值点数**（不是百分比），范围 −100 ~ +300，按钮步进 **±20 威力**，也可直接输入。
-     键盘：`Alt+↑` / `Alt+↓` 同样 ±20 点。
+     键盘：`Alt+↑` / `Alt+↓` 同样 ±20 点，小条态下同样是全局快捷键。
      直接加到技能基础威力上（威力 200 的技能 +20 → 220），进内核的 `attackerPowerBoost`。
      负加成最多把威力压到 0，不会出现负威力。
      到达上下界时输入框会抖一下并提示「已到上限/下限」，不会静默无响应。
      两者非 0 时输入框高亮，卡片底部与摘要（如「威力+40」）会单独标出。
-3. **靶子**：同款选择器 + 防御技能下拉（含「无」与减伤百分比）。靶子性格/加点固定三档：
+3. **靶子**：同款选择器 + 防御技能下拉（第一项「无」、第二项「聚能」，其后是该精灵的防御技能并标注减伤百分比）。
+   **「聚能」不是任何精灵的技能**：它只用于让攻方的「应对状态：」分支生效（41 个攻击技能 + 愿力冲击）；
+   不选它时这些技能一律按「未应对」计算，斩杀层数会偏高——这与上游网页是同一套口径，见第 12 节第 12 条。
+   靶子性格/加点固定三档：
    - 档①「纯肉」：性格 生命↑物攻↓，加点 生命/物防/魔防
    - 档②「防血能力值」：性格 速度↑物攻↓（防御三维无加成），加点 生命/物防/魔防
    - 档③「仅血量能力值」：性格 速度↑物攻↓，加点 仅生命
@@ -164,15 +176,17 @@ npm start       # 已内置 tools/start.mjs：会先清掉 ELECTRON_RUN_AS_NODE 
   菜单打开时窗口从 46px 临时撑到「标题栏 + 菜单」的实际高度（约 160–320px，随菜单内容自适应），
   选完 / 点外部 / 按 Esc 自动收回 46px。
 - 展开态不受影响：四个按钮照旧平铺在标题栏右侧。
+- **加成键在小条态是全局快捷键**：`Ctrl+↑↓` / `Alt+↑↓` 不要求浮窗有焦点，鼠标停在游戏里也能调；
+  展开面板时主进程会主动注销这四个组合键，把 `Ctrl+↑↓` / `Alt+↑↓` 还给系统（细节见第 12 节第 7 条）。
 - **加成提示**：小条态按 `Ctrl+↑↓` / `Alt+↑↓` 改加成后，会在**该精灵名字正下方**浮出一条提示
   （如「攻击 +50%　13/11/9」，副文本是该行三档层数），约 1.4–2s 自动消失。
   提示条是**独立的小窗口**（点击穿透、不抢焦点、始终置顶），**46px 小条本身不撑高、不改尺寸**；
   到上下界时提示变红并写「已到上限 +300%」。拖动小条时提示会自动收起。
-- 搜索框右侧有一个**状态圆点**（不带文字，只占 14px）：金色实心＝接管鼠标，红色空心＝点击穿透；
+- 搜索框右侧有一个**状态圆点**（不带文字，宽 16px / 窄窗 15px）：金色实心＝接管鼠标，红色空心＝点击穿透；
   点一下即可切换。鼠标悬停时圆点会微放大。
-- 字号比展开态大一号（数字 15px / 名字 11.5px / 控件高 26px），把 38px 的条撑满；
+- 字号比展开态大一号（数字 15px / 名字 11.5px / 控件高 26px），把 46px 小条里的 38px 标题栏撑满；
   窗口变窄时自动降档（≤600px / ≤520px 两级）。
-- 搜索框 620 宽下占 56px、守方按钮 64px（都被压缩过），把空间让给三个攻方：
+- 搜索框 620 宽下占 78px、守方按钮 123px（都被压缩过），把空间让给三个攻方：
   **全两位数斩杀线**（如 `30 / 27 / 25`、`50+ / 48 / 42`）在 620 / 560 / 500 三个宽度下都能完整显示，
   实测第三项右边缘均未越界。
 
@@ -206,10 +220,10 @@ npm start       # 已内置 tools/start.mjs：会先清掉 ELECTRON_RUN_AS_NODE 
 ```
 src/
   main/
-    main.js          主进程：透明置顶窗口 / 穿透状态机 / 全局快捷键 / 托盘 / 状态持久化 / 在线数据 / 加成提示小窗
+    main.js          主进程：透明置顶窗口 / 穿透状态机 / 全局快捷键（含小条态加成键）/ 托盘 / 状态持久化 / 在线数据 / 加成提示小窗
     preload.js       contextBridge 安全桥（渲染层无 Node 权限，只暴露白名单方法）
     toast-preload.js 加成提示小窗的安全桥（只有「收文本」「回报宽度」两个能力）
-    smoke.js         无头自检：驱动 UI 并逐帧截图（XY_SMOKE=1 时使用）
+    smoke.js         无头自检：驱动 UI、逐帧截图、37 条断言门禁（无截图 33 条）+ 结果落盘（XY_SMOKE=1 时使用）
   renderer/
     index.html     浮窗页面
     styles.css     深色玻璃拟态样式（透明窗口，卡片自带半透明底）
@@ -225,6 +239,7 @@ tools/
   extract-core.mjs 按行段抽取 calc-core.js（锚点校验 + vm 自检）
   build-data.mjs   生成 src/data/roco-data.js
   verify-core.mjs  回归校验（抽取保真 / 独立公式对拍 / 斩杀线语义 / 组合空间 / 性能 / 默认值）
+  smoke.mjs        无头自检入口（清环境变量 / 设定输出目录 / 汇总断言与透传退出码）
   diag.mjs         一键取证：启动 XY_DIAG → 收起小条 → 桌面截图 → 退出
   make-icon.mjs    生成图标
   start.mjs        清 ELECTRON_RUN_AS_NODE 后启动 Electron（npm start 用）
@@ -235,7 +250,7 @@ tests/             上游权威值对拍（不参与打包，独立依赖 ws，�
   compare-core.mjs     逐位对拍 + 写 REPORT.md；--self-check 负向自检，--json CI 友好
   perf-bench.mjs       性能基准
 start-debug.bat    带 XY_DEBUG=1 启动已打包的绿色版（排查白块/残影用）
-_intermediates/    上游源码（只读）与构建中间产物，不参与打包
+_intermediates/    上游源码（只读）与构建中间产物（含 smoke/ 自检输出），不参与打包
 ```
 
 ---
@@ -244,13 +259,16 @@ _intermediates/    上游源码（只读）与构建中间产物，不参与打�
 
 ```bash
 npm start           # 运行浮窗
-npm run verify      # 数值内核回归校验（离线，几十毫秒）
+npm run verify      # 数值内核回归校验（离线，约 0.1–0.2 秒）
 npm run extract     # 重新从上游抽取 calc-core.js
 npm run build:data  # 重新生成内置数据包
 npm run rebuild     # extract + build:data + verify 一条龙
 npm run make:icon   # 重新生成 src/assets/icon.png 与 icon.ico
 npm run pack        # 重新打包 dist/星陨斩杀线-win32-x64/
 npm run diag        # 一键取证（自动收起小条并截桌面图，产物在 _intermediates/）
+npm run smoke       # 无头自检（含截图与透明占比/残影断言）
+npm run smoke:fast  # 无头自检，跳过截图（远程 / 无交互桌面 / 部分虚拟机）
+npm test            # verify + smoke 一条龙
 ```
 
 `extract` 与 `build:data` 都是**确定性**的：输入不变则产物逐字节不变（可以放心重跑、看 `git diff` 为空）。
@@ -258,15 +276,23 @@ npm run diag        # 一键取证（自动收起小条并截桌面图，产物�
 ### 无头自检（不需要盯屏幕）
 
 ```bash
-# 本机若带 ELECTRON_RUN_AS_NODE=1，必须先清掉（bash）
-ELECTRON_RUN_AS_NODE= XY_SMOKE=1 ./node_modules/electron/dist/electron.exe . --no-sandbox
-# 截图与结果输出到 _intermediates/smoke-*.png，跑完自动退出
+npm run smoke        # 完整自检：驱动 UI + 逐帧截图 + 不透明占比/残影断言
+npm run smoke:fast   # 只跑 DOM / 几何断言，跳过 capturePage（= --no-capture）
 ```
 
-`smoke.js` 会依次驱动：选精灵 → 搜索 → 明细 → 矩阵 → 换靶子 → 小条与守方菜单 → 穿透/展开各种组合，
-每一步都截图并**统计不透明像素占比与非透明包围盒**——「整窗变透明」「内容越出窗口」这类合成问题会直接体现在数字上。
+`tools/smoke.mjs` 是唯一入口：它先清掉 `ELECTRON_RUN_AS_NODE` / `ELECTRON_NO_ATTACH_CONSOLE`
+（带着这两个变量 Electron 会以「纯 Node」跑，窗口起不来还报 `requestSingleInstanceLock` 的怪错），
+默认把截图与结果写到 `_intermediates/smoke/`，并把 Electron 的退出码原样透传。
+`src/main/smoke.js` 依次驱动：选精灵 → 搜索 → 明细 → 矩阵 → 换靶子 → 小条与守方菜单 → 穿透/展开各种组合 →
+小条态全局加成键，最后过一遍**断言门禁（完整 37 条 / 无截图模式 33 条，结构性 / 几何性判据）**，
+任何一条不过就 `app.exit(1)`：
 
-> 在**打包版**里跑自检时要加 `XY_SMOKE_OUT=<外部目录>`：打包版的截图根目录是
+- 运行期把 `userData` 指到 `%TEMP%/xingyun-smoke-<pid>`，**自检不会覆盖用户的 `state.json`**（跑完即删）；
+- 每进入一段就往 `_intermediates/smoke/smoke-progress.log` 追加一行，渲染进程原生崩溃后能反查最后执行到哪；
+- 断言明细与全部采集结果写 `_intermediates/smoke/smoke-result.json`，终端最后一行形如 `[smoke-assert] 37/37 通过`（无截图模式 33/33）；
+- `XY_SMOKE_KEEP_STATE=1` 保留临时 userData，`XY_SMOKE_OUT=<目录>` 改输出目录，`XY_SMOKE_NO_CAPTURE=1` 等价于 `--no-capture`。
+
+> 在**打包版**里跑自检时要加 `XY_SMOKE_OUT=<外部目录>`：打包版的根目录是
 > `resources/app`，不指定就会把 50+ 张截图写进绿色包。
 
 ### 与上游页面逐位对拍（tests/）
@@ -300,22 +326,31 @@ fixtures 的覆盖矩阵与 req 字段）见 `tests/README.md`。注意：`compa
 | G | 867–870 | getBuff（SKILL_MODS 内部依赖，公共清单外补抽） |
 | C | 942–1020 | getFinalStat / STAB / 相性 |
 | D | 2693–2764 | 特性查询、skill mod ctx、能耗 |
-| E | 3356–3937 | SKILL_MODS 全表（约 130 条）、先手表、computeSkillDynamicModifiers |
+| E | 3356–3937 | SKILL_MODS 全表（44 个键 = 41 条定义 + 3 条同族别名）、先手表、computeSkillDynamicModifiers |
 | F | 3948–4051 | computeFinalDamage |
 
 脚本对每段做首/末行锚点校验（上游漂移立即报错退出），生成后自检符号齐全、vm 加载、用真实数据跑通一次伤害。
 生成文件头部记录了上游 `sha256`，可与 `_intermediates/upstream/calculator.js` 直接比对。
 
+段 E 之后还会**注入一小段补丁**（不属于上游抽取段）：上游 `FIRST_STRIKE_SKILLS` / `LAST_STRIKE_SKILLS`
+用 `skill_000654` 这类遗留 id 作键，而数据包的键是中文技能名，不补这层 `isFirstStrike()` 恒为 false。
+生成器按名字补入「俯冲 / 先发制人 / 天旋地转 / 后发制人」，并在生成前校验这些名字在 `skills.json` 里存在——
+上游改名时 `npm run extract` 直接失败，不会静默注入死键（见第 12 节第 13 条）。
+
 `npm run verify` 的校验项：
 
 1. **抽取保真**：生成文件里 7 个段与上游对应行**逐字相同**；
 2. **独立实现对拍**：另写一份按规格文字重写的公式（不调用 calc-core 任何函数），在动态修正为空的场景下
-   重算 skillDmg / starDmg / finalDamage / defHP，要求逐值相等（≥ 20 组 × 4 个层数）；
+   重算 skillDmg / starDmg / finalDamage / defHP，要求逐值相等（40 组 × 4 个层数）；
 3. **斩杀线语义**：命中层前一层必打不死、命中层必打死、0..上限伤害单调非递减；
+   抽查组合里必须至少有一个可斩（否则这几条断言空转，直接报红）；
    快速求解（二次估计 + 局部验证）与纯二分结果完全一致；精简精灵与原始精灵逐值一致；
 4. **组合空间**：默认口径 5 性格 × 4 加点 = 20 组；全量枚举 30 性格（up≠down）× 20 加点 = 600 且无重复（仅回归校验用），三档靶子定义正确；
-5. **性能**：主路径 3 攻方 × 3 档 × 1 套配置 = 9 次求解，冷启动 **< 100ms**（实际约 2ms）；
-6. **默认值**：攻击技能默认按主攻类别匹配、防御列表含「无」、手动性格覆盖生效。
+5. **性能**：主路径 3 攻方 × 3 档 × 1 套配置 = 9 次求解，冷启动 **< 100ms**（实测约 2–3ms）；
+   3 攻方 × 3 档 × 20 组 = 180 次求解的全量同样 < 100ms；另对单格做 20 组参考（层上限 50），
+   要求最小值有限且可斩计数在 1..20（实测最小值 13 层、20/20 可斩）；
+6. **默认值**：攻击技能默认按主攻类别匹配、防御列表含「无」+「聚能」（第二项，`category='状态'`，
+   且能真实触发「应对状态」加成）、先手表能对上数据包的中文技能键、手动性格覆盖生效。
 
 求解策略（为什么快）：
 
@@ -344,11 +379,16 @@ npm run pack
 - 若 packager 因网络等原因不可用，脚本会自动回退到「手工组装」：复制 electron dist、
   放好 `resources/app`、把 electron.exe 改名为 星陨斩杀线.exe，产出同样可双击运行。
 - 未内置代码签名，首次运行 SmartScreen 可能提示「未知发布者」，选「仍要运行」即可。
-打包脚本会在产出后做两件事：
+打包脚本会在产出后做三件事：
 
-1. **清理**：删掉 `resources/app` 里误入的 `_intermediates` / `tests` 等目录；
-   这些目录通常是被 `XY_SMOKE` 自检写进去的（打包版的截图根目录是 `resources/app`）。
-2. **瘦身**（默认开启）：见下节。
+1. **白名单过滤**：`@electron/packager` 的 `ignore` 必须直接传**函数**——传数组时会走正则分支，
+   函数被 `String()` 成源码再当正则解析，一条都匹配不上，等于没有过滤。
+   `manualPack` 回退路径使用与 packager 路径一致的白名单（当前是硬编码列表：`src` / `tools` /
+   `package.json` / `README.md` / `LICENSE` / `start-debug.bat`），并跳过 Windows 上非管理员创建会 `EPERM` 的符号链接。
+   改白名单时两处都要改——回退路径不会自动继承 `INCLUDE` 常量。
+2. **清理**：`sanitizePack()` 删掉 `resources/app` 里白名单外的残留（误入的 `_intermediates` / `tests`、
+   `node_modules` 空目录壳等），兜底 packager 的行为差异。
+3. **瘦身**（默认开启）：见下节。
 
 ### 产物体积
 
@@ -361,13 +401,14 @@ npm run pack
 ### 瘦身做了什么
 
 `tools/pack.mjs` 的 `slimPack()` 只删**确认非运行必需**的文件，每一项都在本机跑过完整的
-`XY_SMOKE` 自检（9 格出数 / 明细 20 组 / 矩阵 20 格 / 小条 46px 无横向溢出 / 透明窗口不透明占比 0.498 / 快捷键）：
+`XY_SMOKE` 自检（**37 条断言**全绿，`smoke:fast` 33 条：9 格出数 / 明细 20 组 / 矩阵 20 格 / 小条 46px 无横向溢出 /
+透明窗口不透明占比 / 无残影 / 快捷键链 / 小条态全局加成键）：
 
 | 删除项 | 原始体积 | 依据 |
 | --- | --- | --- |
 | `locales/*.pak` 除 zh-CN / zh-TW / en-US / en-GB 外 51 个 | 40.2 MB | 界面自绘中文，语言包只影响 Chromium 内置文案与字体回退 |
 | `LICENSES.chromium.html` | 11.7 MB | Chromium 许可全文；仓库 LICENSE 已含第三方声明 |
-| `vk_swiftshader.dll` + `vulkan-1.dll` | 6.2 MB | Vulkan 软件渲染回退，有显卡的正常机器不加载 |
+| `vk_swiftshader.dll` + `vk_swiftshader_icd.json` + `vulkan-1.dll` | 6.2 MB | Vulkan 软件渲染回退，有显卡的正常机器不加载 |
 | `d3dcompiler_47.dll` | 4.7 MB | 系统自带同名文件（`C:\Windows\System32`），删除 local 副本走系统 |
 
 开关：
@@ -399,15 +440,32 @@ XY_PACK_KEEP_LICENSES=1 npm run pack   # 瘦身但保留 Chromium 许可全文
    断网启动始终使用内置包（内置包与线上版本可能有版本差）。
 6. **透明窗口的边缘缩放不稳定**：窗口 `resizable`，但 Windows 对无边框透明窗口的鼠标边缘拖拽支持时好时坏；
    拖不到边时可先拖标题栏移动，或改 `state.json` 里的 width/height。
-7. **穿透状态不接收键盘**：`Esc`、`Tab`、方向键（含 `Ctrl/Alt+↑↓`）都只在接管鼠标后有效——穿透态窗口
-   `setFocusable(false)`，DOM 收不到任何按键；穿透时请用 `Alt+X` / `Ctrl+Alt+T` / 托盘唤回。
+7. **键盘分两类，行为不同**：
+   - **加成键**（`Ctrl+↑↓` 攻击 / `Alt+↑↓` 威力）：**小条态下是全局快捷键**，焦点在游戏里、
+     或浮窗处于穿透态，都照样生效——这是小条的主要用法（46px 条几乎不挡画面，人一直在游戏里）。
+     展开态会主动注销全局注册，退回普通键盘事件（避免长期占用系统组合键）。
+   - **其余键**（`Esc`、`Tab`、裸方向键）：只在接管鼠标后有效——穿透态窗口 `setFocusable(false)`，
+     DOM 收不到按键；穿透时请用 `Alt+X` / `Ctrl+Alt+T` / 托盘唤回。
    加成提示小窗本身是点击穿透的，显示期间不影响游戏操作。
+
+   > 全局注册若被其它程序占用（例如某些显卡/输入法工具会抢 `Ctrl+↑↓`），只降级不报错：
+   > 该组仍可用普通键盘路径（接管鼠标 + 窗口有焦点），托盘与小条功能不受影响。
 8. **加成提示小窗的最小高度是 36px**：Windows 对无边框透明窗口有最小跟踪高度（实测要求 20/24/28px
    都会被撑到 30/34/36），所以提示条按 36px 出窗、内容在窗内垂直居中。
 9. **头像来自 patchwiki 外链**：离线时头像加载失败会自动降级为属性 emoji，不影响功能。
 10. **选择器列表默认只渲染前 200 只**（共 622）：输入搜索词会跨全量匹配。
 11. **体积**：绿色文件夹约 224MB（瘦身后），主要是 Electron 运行时（exe 本体就有 192MB）；
     这是「免安装 + 自带 Chromium」的代价，换 Electron 以外的方案才能进一步下降。
+12. **「聚能」是防御下拉的第二项**：它不对应任何精灵技能，作用是让攻方的「应对状态：」分支生效
+    （共 41 个攻击技能 + 愿力冲击）。不选「聚能」时这些技能一律按「未应对」计算，层数会偏高——
+    这是上游网页的同一套口径，不是本工具的偏差。
+13. **上游先手表用遗留 id 作键**：`FIRST_STRIKE_SKILLS` / `LAST_STRIKE_SKILLS` 上游写的是
+    `skill_000654` 这类 id，而数据包的键是中文技能名。生成器（`tools/extract-core.mjs`）会按名字
+    补一层键映射（俯冲 / 先发制人 / 天旋地转 / 后发制人），并在生成前校验这些名字在数据里存在；
+    上游改名时 `npm run extract` 会直接失败而不是静默失效。
+14. **某些桌面会话下 `capturePage` 会触发原生崩溃**：远程 / 无交互桌面 / 部分虚拟机里，自检截图
+    可能让渲染进程以 `0x80000003` 退出。此时用 `npm run smoke:fast`（= `XY_SMOKE_NO_CAPTURE=1`）
+    跳过截图，只跑 DOM 与几何断言；退出码同样可信。
 
 ---
 
