@@ -41,16 +41,15 @@
 打开 **[Releases](https://github.com/Elysion816/roco-star-dmg-overlay/releases/latest)**，下载最新的 zip：
 
 ```
-roco-star-dmg-overlay-v1.0.4-win32-x64.zip    （约 72 MB）
-roco-star-dmg-overlay-v1.0.4-win32-x64.7z     （约 63 MB，需 7-Zip / Bandizip 解压）
+roco-star-dmg-overlay-v1.0.5-win32-x64.zip    （约 72 MB）
+roco-star-dmg-overlay-v1.0.5-win32-x64.7z     （约 63 MB，需 7-Zip / Bandizip 解压）
 ```
 
 > Release 资产名使用 ASCII：GitHub 上传接口会丢掉文件名里的非 ASCII 前缀。
 > 解压出来的目录仍然是 `星陨斩杀线-win32-x64/`，里面就是 `星陨斩杀线.exe`。
 >
-> **版本状态**：最近一次 Release 是 **v1.0.4（2026-11-15）**；`main` 上已包含 **v1.0.5** 的未出包改动
-> （小条态全局加成键、「聚能」防御口径、先手表修复、明细底部条修复等），逐条见 [CHANGELOG.md](CHANGELOG.md)。
-> 想立刻用上这些改动可从源码运行（方式 B），或等 v1.0.5 的绿色包。
+> **版本状态**：最新 Release 是 **v1.0.5（2026-11-18）**——小条态全局加成键、「聚能」防御口径、
+> 先手表修复、明细底部条修复等，逐条见 [CHANGELOG.md](CHANGELOG.md)；`main` 与 Release 同步。
 
 解压后双击里面的 **`星陨斩杀线.exe`** 即可运行。
 
@@ -384,7 +383,7 @@ npm run pack
 1. **白名单过滤**：`@electron/packager` 的 `ignore` 必须直接传**函数**——传数组时会走正则分支，
    函数被 `String()` 成源码再当正则解析，一条都匹配不上，等于没有过滤。
    `manualPack` 回退路径使用与 packager 路径一致的白名单（当前是硬编码列表：`src` / `tools` /
-   `package.json` / `README.md` / `LICENSE` / `start-debug.bat`），并跳过 Windows 上非管理员创建会 `EPERM` 的符号链接。
+   `package.json` / `README.md` / `CHANGELOG.md` / `LICENSE` / `start-debug.bat`），并跳过 Windows 上非管理员创建会 `EPERM` 的符号链接。
    改白名单时两处都要改——回退路径不会自动继承 `INCLUDE` 常量。
 2. **清理**：`sanitizePack()` 删掉 `resources/app` 里白名单外的残留（误入的 `_intermediates` / `tests`、
    `node_modules` 空目录壳等），兜底 packager 的行为差异。

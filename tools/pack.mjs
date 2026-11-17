@@ -31,6 +31,7 @@ const OUT_DIR_NAME = APP_NAME + '-win32-x64';
 const INCLUDE = [
   /^\/package\.json$/,
   /^\/README\.md$/,
+  /^\/CHANGELOG\.md$/,
   /^\/LICENSE$/,
   /^\/start-debug\.bat$/,
   /^\/src(\/|$)/,
@@ -100,7 +101,7 @@ function manualPack() {
   fs.mkdirSync(appDir, { recursive: true });
   // 与 packager 路径保持同一份白名单（INCLUDE）：两条路径的产物必须一致，
   // 否则回退产出的包里会缺 LICENSE / README / start-debug.bat，用户拿到的是残包。
-  for (const entry of ['package.json', 'README.md', 'LICENSE', 'start-debug.bat']) {
+  for (const entry of ['package.json', 'README.md', 'CHANGELOG.md', 'LICENSE', 'start-debug.bat']) {
     const src = path.join(ROOT, entry);
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(appDir, entry));
   }
@@ -165,7 +166,7 @@ function sanitizePack(outDir) {
   if (!fs.existsSync(appDir)) return [];
   // node_modules 不在白名单里：应用运行时不需要任何依赖（electron API 由运行时提供），
   // prune 之后残留的只是 @electron / @types 这类空目录壳，留着既无意义也会让人误以为有依赖。
-  const KEEP = new Set(['package.json', 'README.md', 'LICENSE', 'start-debug.bat', 'src', 'tools']);
+  const KEEP = new Set(['package.json', 'README.md', 'CHANGELOG.md', 'LICENSE', 'start-debug.bat', 'src', 'tools']);
   const removed = [];
   for (const name of fs.readdirSync(appDir)) {
     if (KEEP.has(name)) continue;
