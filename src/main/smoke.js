@@ -16,6 +16,11 @@ const { globalShortcut, screen, BrowserWindow } = require('electron');
 function createRunner(win, app, ROOT) {
   const js = code => win.webContents.executeJavaScript(code, true);
   const wait = ms => new Promise(r => setTimeout(r, ms));
+  // XY_SMOKE_NO_CAPTURE=1：跳过 capturePage，只跑 DOM/几何断言。
+  // 用途：某些桌面会话（无交互桌面 / 远程会话 / 部分虚拟机）下 capturePage 会让
+  // 渲染进程直接触发原生崩溃（Windows 退出码 0x80000003），此时截图与透明占比断言
+  // 本来也拿不到可信数据，但结构性断言仍然有意义。
+  const noCapture = process.env.XY_SMOKE_NO_CAPTURE === '1';
   // 截图输出目录：默认 <app>/_intermediates。
   // 用 XY_SMOKE_OUT 覆盖——在**打包版**里跑自检时 ROOT 是 resources/app，
   // 不覆盖就会把 50+ 张截图写进绿色包，污染待发布的产物。
@@ -24,6 +29,7 @@ function createRunner(win, app, ROOT) {
     : path.join(ROOT, '_intermediates');
 
   async function capture(name) {
+    if (noCapture) return null; // 见 createRunner 里 XY_SMOKE_NO_CAPTURE 的说明
     try {
       fs.mkdirSync(outDir, { recursive: true });
       const img = await win.webContents.capturePage();
@@ -52,13 +58,28 @@ function createRunner(win, app, ROOT) {
   }
 
   let lastBox = null;
-  return { js, wait, capture, getBox: () => lastBox, outDir };
+  return { js, wait, capture, getBox: () => lastBox, outDir, noCapture };
 }
 
 async function run(win, app, ROOT) {
   const runner = createRunner(win, app, ROOT);
   const { js, wait, capture } = runner;
   const results = {};
+
+  // 进度落盘：自检跑几分钟，期间 stdout 是块缓冲（管道写满才 flush），
+  // 一旦渲染进程原生崩溃，缓冲连同崩溃点信息一起丢失，只剩"进程没了"这一条线索。
+  // 每进入一段就 append 一行，崩溃后可以从文件反查最后执行到哪里。
+  const progressFile = path.join(runner.outDir, 'smoke-progress.log');
+  let lastStage = 'start';
+  const mark = (stage) => {
+    lastStage = stage;
+    results.lastStep = stage;
+    try {
+      fs.mkdirSync(runner.outDir, { recursive: true });
+      fs.appendFileSync(progressFile, '[' + new Date().toISOString() + '] ' + stage + '\n');
+    } catch (e) { /* 进度记录失败不影响自检 */ }
+  };
+  mark('begin');
   const SEL_PICKER_ATK1 = '.picker-btn[data-slot="atk1"]';
   const SEL_PICKER_DEF = '.picker-btn[data-slot="def"]';
 
@@ -70,6 +91,7 @@ async function run(win, app, ROOT) {
   const Q = sel => 'document.querySelector(' + JSON.stringify(sel) + ')';
   const F = 'window.__xyDebug.focusRow';
   try {
+    mark('adaptive-height');
     // 自适应高度（首次展开，用户还没手动拖过）
     await wait(700);
     results.autoHeight = {
@@ -82,6 +104,7 @@ async function run(win, app, ROOT) {
     results.tierHeads = await js('Array.prototype.slice.call(document.querySelectorAll(".tier-head")).map(function(e){ return { text: e.textContent.trim(), title: e.title, w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height), clipped: e.scrollWidth > e.clientWidth + 1 }; })');
     results.a1 = await capture('smoke-1-initial.png');
 
+    mark('picker');
     // ① 打开攻①选择器
     await js('document.querySelector(\'' + SEL_PICKER_ATK1 + '\').click()');
     await wait(500);
@@ -104,11 +127,44 @@ async function run(win, app, ROOT) {
     results.manualRecompute = await js('(function(){ var t = performance.now(); window.__xyDebug.recompute(); return Number((performance.now()-t).toFixed(1)); })()');
     results.afterManual = await js('({ lastFullMs: Math.round(window.__xyDebug.lastFullMs||0), gridMs: Number((window.__xyDebug.gridMs||0).toFixed(2)) })');
 
+    mark('detail');
     // ④ 展开明细（分组清单）
     await js('document.querySelector(".cell").click()');
     await wait(400);
     results.detail = await js('({ open: !document.getElementById("detail").classList.contains("is-hidden"), rows: document.querySelectorAll(".crow").length, groups: document.querySelectorAll(".group").length, sum: (document.getElementById("detailSum")||{}).textContent || "", foot: (document.getElementById("detailFoot")||{}).textContent||"" })');
     results.a5 = await capture('smoke-5-detail.png');
+
+    // ④b 点明细行 / 矩阵格 → 底部条必须真的更新（回归：footText 曾读不存在的 cell.all 而抛错，
+    // 表现为点了没反应、底部永远停在初始提示）
+    results.detailFoot = {};
+    results.detailFoot.footBefore = await js('(document.getElementById("detailFoot")||{}).textContent || ""');
+    await js('(function(){ var r = document.querySelector(".crow"); if (r) r.click(); return true; })()');
+    await wait(260);
+    results.detailFoot.afterRowClick = await js('(document.getElementById("detailFoot")||{}).textContent || ""');
+    // 文案必须含「0 层伤害」与「层伤害」两个口径，且带上 dmg0 / defHP 的具体数字
+    results.detailFoot.rowHasZeroLayerDmg = /0\s*层伤害\s*\d+/.test(results.detailFoot.afterRowClick);
+    results.detailFoot.rowHasDefHP = /\/\s*\d+/.test(results.detailFoot.afterRowClick);
+    // 切到矩阵再点一格，同样必须更新
+    await js('document.querySelector(".tab[data-view=matrix]").click()');
+    await wait(300);
+    results.detailFoot.matrixFootBefore = await js('(document.getElementById("detailFoot")||{}).textContent || ""');
+    // 必须点一个**不是当前配置**的格，否则底部条内容与点之前完全一致，断言会假红
+    // 逐个点矩阵格，直到底部条文案发生变化：不同组合的层数/伤害不同，文案必然不同。
+    // 只点第一格不可靠——它可能就是"当前配置"那一格，点了文案不变。
+    results.detailFoot.cellClicksTried = 0;
+    results.detailFoot.afterCellClick = results.detailFoot.matrixFootBefore;
+    for (let ci = 0; ci < 20; ci++) {
+      await js('(function(i){ var all = Array.prototype.slice.call(document.querySelectorAll(".mcell")); if (all[i]) all[i].click(); return true; })(' + ci + ')');
+      await wait(120);
+      const txt = await js('(document.getElementById("detailFoot")||{}).textContent || ""');
+      results.detailFoot.cellClicksTried = ci + 1;
+      if (txt !== results.detailFoot.matrixFootBefore) { results.detailFoot.afterCellClick = txt; break; }
+    }
+    results.detailFoot.cellHasZeroLayerDmg = /0\s*层伤害\s*\d+/.test(results.detailFoot.afterCellClick);
+    // 渲染层不应抛出未捕获异常（footText 的 TypeError 会被 window.onerror / console.error 捕获）
+    results.detailFoot.jsErrors = await js('(function(){ return (window.__xyErrors || []).slice(0, 5); })()');
+    await js('document.querySelector(".tab[data-view=groups]").click()');
+    await wait(200);
 
     // ⑤ 矩阵视图
     await js('document.querySelector(".tab[data-view=matrix]").click()');
@@ -201,6 +257,7 @@ async function run(win, app, ROOT) {
 
 
 
+    mark('collapse');
     // ⑧ 小条（收起 / 展开）——本 bug 的回归用例
     results.collapse = {};
     results.collapse.hotkeyRegistered = globalShortcut.isRegistered('Control+Shift+M');
@@ -713,6 +770,7 @@ async function run(win, app, ROOT) {
     results.a18 = await capture('smoke-18-minibar-default.png');
 
 
+    mark('mods');
     // ⑮ 攻方加成：按钮步进 / 手填 / 边界 / 隔离 / 小条标记
     results.mods = {};
     await js('window.api.setCollapsed(false)');
@@ -893,6 +951,7 @@ async function run(win, app, ROOT) {
     await wait(600);
     results.mods.afterReset = await js('Array.prototype.slice.call(document.querySelectorAll(".cell-main")).map(function(e){ return e.textContent; })');
 
+    mark('hotkeys');
     // ⑮b 焦点快捷键：Tab / ↑↓ 选攻方，Ctrl+↑↓ 攻击加成，Alt+↑↓ 威力加成（K / Q / F 见 run() 开头）
     // 先清掉上一步留在加成输入框里的焦点：输入框内 Tab / 裸 ↑↓ 是原生行为（有意让位），
     // 不 blur 的话这一段测的就不是"全局焦点快捷键"了。
@@ -1211,6 +1270,7 @@ async function run(win, app, ROOT) {
     results.z5.note = await js('(document.getElementById("gridNote")||{}).textContent || ""');
 
 
+    mark('ghost');
     // ⑳ 透明窗口残影：反复进出小条 / 拖宽 / 开关菜单，逐步做 alpha 包围盒检查
     results.ghost = { samples: [] };
     const sample = async (label) => {
@@ -1281,6 +1341,72 @@ async function run(win, app, ROOT) {
     results.ghost.worstRight = Math.max.apply(null, results.ghost.samples.map(x => x.rightBand));
     results.ghost.worstBottom = Math.max.apply(null, results.ghost.samples.map(x => x.bottomBand));
 
+    // ⑲ 小条态全局加成快捷键：注册状态 + 转发链路
+    {
+      mark('global-mods');
+      // 先回到小条态
+      await js('window.api.setCollapsed(true)');
+      await wait(500);
+      const combos = ['Control+Up', 'Control+Down', 'Alt+Up', 'Alt+Down'];
+      results.miniGlobalMods = {
+        combosCollapsed: combos.map(c => ({ c: c, on: globalShortcut.isRegistered(c) })),
+        registeredCollapsed: combos.every(c => globalShortcut.isRegistered(c)),
+      };
+
+      // 把加成清零，记住当前选中行，然后用主进程同一条 IPC 通道转发一次
+      await js('(function(){ var rows=["atk1","atk2","atk3"]; rows.forEach(function(r){ var i=document.querySelector(".mod-input[data-slot=" + r + "][data-mod=atkPct]"); if(i){ i.value="0"; i.dispatchEvent(new Event("change")); } }); return true; })()');
+      await wait(500);
+      const focusBefore = await js(F);
+      const before = await js('JSON.stringify(window.__xyDebug.mods)');
+      // 走主进程真实链路的最后一段：与 dispatchModBump() 发出的 payload 完全一致。
+      // （dispatchModBump 本身只是「检查 collapsed + send」，这里去掉检查才能验证渲染层链路）
+      win.webContents.send('mods:bump', { key: 'atkPct', dir: 1, via: 'global' });
+      const fired = true;
+      await wait(400);
+      const after = await js('JSON.stringify(window.__xyDebug.mods)');
+      const bm = JSON.parse(before), am = JSON.parse(after);
+      const changedRows = ['atk1', 'atk2', 'atk3'].filter(r => bm[r].atkPct !== am[r].atkPct);
+      results.miniGlobalMods.fired = fired;
+      results.miniGlobalMods.focusRow = focusBefore;
+      results.miniGlobalMods.before = bm[focusBefore] && bm[focusBefore].atkPct;
+      results.miniGlobalMods.after = am[focusBefore] && am[focusBefore].atkPct;
+      results.miniGlobalMods.changedRows = changedRows;
+      results.miniGlobalMods.bumpApplied = bm[focusBefore].atkPct !== am[focusBefore].atkPct;
+      results.miniGlobalMods.bumpTargetCorrect = changedRows.length === 1 && changedRows[0] === focusBefore;
+      // 复位
+      await js('(function(){ var rows=["atk1","atk2","atk3"]; rows.forEach(function(r){ var i=document.querySelector(".mod-input[data-slot=" + r + "][data-mod=atkPct]"); if(i){ i.value="0"; i.dispatchEvent(new Event("change")); } }); return true; })()');
+      await wait(400);
+
+      // ★ 核心验证：小条窗口失去焦点后，全局快捷键链路仍必须有效。
+      //   globalShortcut 本来就是系统级、与焦点无关；这里验证的是渲染层那一端
+      //   也不依赖焦点（它能收到 mods:bump 并真的改数值）。
+      //   小条常驻时人一直在游戏里，正是这个场景。
+      win.blur();
+      await wait(400);
+      const unfocused = await js('document.hasFocus() === false || document.activeElement === document.body');
+      results.miniGlobalMods.windowUnfocused = unfocused;
+      const bfBefore = await js('JSON.stringify(window.__xyDebug.mods)');
+      win.webContents.send('mods:bump', { key: 'powerAdd', dir: 1, via: 'global' });
+      await wait(400);
+      const bfAfter = await js('JSON.stringify(window.__xyDebug.mods)');
+      const bb = JSON.parse(bfBefore), aa = JSON.parse(bfAfter);
+      const pRow = await js(F);
+      results.miniGlobalMods.unfocusedBefore = bb[pRow] && bb[pRow].powerAdd;
+      results.miniGlobalMods.unfocusedAfter = aa[pRow] && aa[pRow].powerAdd;
+      results.miniGlobalMods.unfocusedWorks = bb[pRow].powerAdd !== aa[pRow].powerAdd;
+      // 顺带确认小条还在（失焦不该把它收起或撑高）
+      results.miniGlobalMods.unfocusedHeight = win.getBounds().height;
+      await js('(function(){ var rows=["atk1","atk2","atk3"]; rows.forEach(function(r){ var i=document.querySelector(".mod-input[data-slot=" + r + "][data-mod=powerAdd]"); if(i){ i.value="0"; i.dispatchEvent(new Event("change")); } }); return true; })()');
+      await wait(400);
+
+      // 展开态：主进程应注销全局键
+      await js('window.api.setCollapsed(false)');
+      await wait(600);
+      results.miniGlobalMods.combosExpanded = combos.map(c => ({ c: c, on: globalShortcut.isRegistered(c) }));
+      results.miniGlobalMods.registeredExpanded = combos.some(c => globalShortcut.isRegistered(c));
+    }
+
+    mark('bench');
     // ⑦ 性能基准：清缓存后连续跑 3 次「3 攻方 × 3 档 × 20 组 = 180 次求解」全量
     results.bench = await js('(function(){ var D = window.RocoDomain; var rows = ["atk1","atk2"]; var out = []; var note = "";' +
       ' for (var run = 0; run < 3; run++) { D.clearCache(); var t0 = performance.now();' +
@@ -1291,13 +1417,173 @@ async function run(win, app, ROOT) {
       ' return out; })()');
     results.noteAfterPick = await js('(document.getElementById("gridNote")||{}).textContent||""');
 
+    mark('collect-done');
   } catch (e) {
     results.error = String((e && e.message) || e);
     results.errorStack = String((e && e.stack) || '');
     results.errorAt = results.lastStep || null;
   }
+
+  // ---------------------------------------------------------------------------
+  // 断言门禁
+  //
+  // 这一步才是「测试」而不是「取证」：把采集到的关键数字变成退出码，
+  // 否则整份 results 只能靠人读 JSON 看图，回归永远绿灯。
+  // 断言只用**结构性/几何性**判据（数量、尺寸、溢出、比例区间），
+  // 不绑定具体数值（数值正确性归 npm run verify 与 tests/ 对拍管）。
+  //
+  // 注意：整块包在 try 里。断言自身写错时不应该把进程带崩——
+  // 那会让「自检失败」和「自检崩了」长得一样，反而更难查。
+  // ---------------------------------------------------------------------------
+  const asserts = [];
+  const check = (name, pass, detail) => asserts.push({ name: name, pass: !!pass, detail: detail });
+  try {
+
+  if (results.error) check('流程未抛异常', false, results.error);
+
+  // 9 格结构
+  const init = results.initial || {};
+  check('9 格齐全', init.cells === 9, 'cells=' + init.cells);
+  const vals = (init.values || []).map(v => String(v));
+  check('9 格都出数', vals.length === 9 && vals.every(v => v && v !== '—' && v !== '缺少数据'), JSON.stringify(vals));
+
+  // 明细：20 组 + 5×4 矩阵
+  const det = results.detail || {};
+  check('明细共 20 组', det.rows === 20, 'rows=' + det.rows);
+  const mx = results.matrix || {};
+  check('矩阵 5 行 4 列（+表头行）', mx.cells === 20, 'cells=' + mx.cells);
+  const z5m = (results.z5 && results.z5.matrix) || {};
+  check('Z5 矩阵仍为 20 格', z5m.cells === 20, 'cells=' + z5m.cells);
+
+  // 小条：46px 且没有横向溢出
+  const col = results.collapse || {};
+  check('小条实际高度 46px', col.afterCollapse && col.afterCollapse.realHeight === 46,
+    'h=' + (col.afterCollapse && col.afterCollapse.realHeight));
+  const ml = col.miniLayout || {};
+  check('小条标题栏无横向溢出', typeof ml.overflow === 'number' && ml.overflow <= 0, 'overflow=' + ml.overflow);
+  check('小条三攻方齐全', Array.isArray(ml.items) && ml.items.length === 3, 'items=' + (ml.items || []).length);
+  check('小条摘要数字完整未裁切',
+    Array.isArray(ml.items) && ml.items.every(i => !i.clipped), JSON.stringify((ml.items || []).map(i => i.clipped)));
+
+  // ⋯ 菜单：撑高后必须完整落在窗口内
+  const mm = col.moreMenu || {};
+  check('⋯ 菜单四项齐全', Array.isArray(mm.items) && mm.items.length === 4, JSON.stringify(mm.items));
+  check('⋯ 菜单横向在窗内', mm.insideRight === true, 'insideRight=' + mm.insideRight);
+  check('⋯ 菜单纵向在窗内', mm.insideBottom === true, 'insideBottom=' + mm.insideBottom);
+  check('⋯ 菜单收回后窗口回到 46', col.moreMenuClosedWinH === 46, 'h=' + col.moreMenuClosedWinH);
+
+  // 快捷键面板：9 条（README 与实现一致；第 9 条是小条态全局加成键的说明行）
+  const sc = col.shortcutPanel || {};
+  check('快捷键面板 9 条', sc.rows === 9, 'rows=' + sc.rows);
+
+  // 状态圆点：接管金色实心 / 穿透红空心，两者颜色必须不同
+  const dotT = col.dotTakeover || {};
+  const dotP = col.dotPassthrough || {};
+  check('状态圆点随模式变色',
+    dotT.cls !== dotP.cls || dotT.dotBg !== dotP.dotBg || dotT.dotBorder !== dotP.dotBorder,
+    JSON.stringify({ t: dotT.cls, p: dotP.cls }));
+  check('状态圆点宽度固定（不因模式变化撑开布局）',
+    dotT.w === dotP.w, 'w=' + dotT.w + '/' + dotP.w);
+
+  // 透明窗口：不透明占比必须落在合理区间（整窗变透明 → 掉到 0；整窗变白块 → 冲到 1）
+  //
+  // XY_SMOKE_NO_CAPTURE=1 时不产生截图，这两条按"跳过"处理（记为 skipped，不算失败），
+  // 否则无截图模式会永远报两条假红，门禁就没人看了。
+  const miniRatio = typeof results.a9 === 'number' ? results.a9 : null;
+  const fullRatio = typeof results.a1 === 'number' ? results.a1 : null;
+  if (runner.noCapture) {
+    results.skipped = results.skipped || [];
+    results.skipped.push('不透明占比断言（XY_SMOKE_NO_CAPTURE=1）');
+  } else {
+    check('小条不透明占比合理', miniRatio !== null && miniRatio > 0.05 && miniRatio < 0.95, 'ratio=' + miniRatio);
+    check('展开态不透明占比合理', fullRatio !== null && fullRatio > 0.15 && fullRatio < 0.98, 'ratio=' + fullRatio);
+  }
+
+  // 残影：右侧 80px / 底部 20px 不允许出现不透明像素（依赖截图包围盒，无截图时跳过）
+  const ghost = results.ghost || {};
+  if (runner.noCapture) {
+    results.skipped.push('残影包围盒断言（XY_SMOKE_NO_CAPTURE=1）');
+  } else {
+    check('无右侧残影', ghost.worstRight <= 0, 'worstRight=' + ghost.worstRight);
+    check('无底部残影', ghost.worstBottom <= 0, 'worstBottom=' + ghost.worstBottom);
+  }
+
+  // 加成提示：主窗保持 46px（提示是独立窗口，不能把小条撑高）
+  check('加成提示不改变主窗高度', results.toast && results.toast.mainStill46 === true,
+    'mainStill46=' + (results.toast && results.toast.mainStill46));
+
+  // 焦点快捷键链路完整（⑮b 展开态 12 步 + ⑮c 小条态若干步）
+  const hk = results.hotkeys || {};
+  check('展开态焦点快捷键链路完整', Array.isArray(hk.steps) && hk.steps.length === 12,
+    'steps=' + (hk.steps || []).length);
+  check('焦点环始终只有一个',
+    Array.isArray(hk.ring) && hk.ring.filter(r => r.focus).length === 1,
+    JSON.stringify(hk.ring));
+  const hkm = results.hotkeysMini || {};
+  check('小条态焦点快捷键链路完整', Array.isArray(hkm.steps) && hkm.steps.length >= 4,
+    'steps=' + (hkm.steps || []).length);
+
+  // 明细底部条：点行 / 点矩阵格后必须真的更新，且带对 0 层伤害与 defHP 两个口径
+  const df = results.detailFoot || {};
+  check('点明细行后底部条更新', typeof df.afterRowClick === 'string' && df.afterRowClick.length > 0 &&
+    df.afterRowClick !== df.footBefore, JSON.stringify(df.afterRowClick).slice(0, 120));
+  check('底部条含 0 层伤害数字', df.rowHasZeroLayerDmg === true, 'text=' + String(df.afterRowClick).slice(0, 120));
+  check('底部条含 defHP 分母', df.rowHasDefHP === true, 'text=' + String(df.afterRowClick).slice(0, 120));
+  check('点矩阵格后底部条更新', typeof df.afterCellClick === 'string' && df.afterCellClick.length > 0 &&
+    df.afterCellClick !== df.matrixFootBefore, JSON.stringify(df.afterCellClick).slice(0, 120));
+  check('矩阵格底部条含 0 层伤害数字', df.cellHasZeroLayerDmg === true, 'text=' + String(df.afterCellClick).slice(0, 120));
+  check('明细交互未抛 JS 异常', Array.isArray(df.jsErrors) && df.jsErrors.length === 0, JSON.stringify(df.jsErrors));
+
+  // 小条态全局加成快捷键
+  //  这里不能真的按系统键（自检不驱动 OS 输入），改为验证两条链路：
+  //   ① 主进程确实在小条态注册了全局键（globalShortcut.isRegistered）
+  //   ② 主进程转发 → 渲染层 bumpMod → 数值真的变了
+  // 展开态还必须是「已注销」，否则会长期抢占系统组合键。
+  {
+    const mini = results.miniGlobalMods || {};
+    check('小条态注册了全局加成键', mini.registeredCollapsed === true,
+      'Combos=' + JSON.stringify(mini.combosCollapsed));
+    check('展开态已注销全局加成键', mini.registeredExpanded === false,
+      'Combos=' + JSON.stringify(mini.combosExpanded));
+    check('全局键转发后加成真的变化', mini.bumpApplied === true,
+      'before=' + mini.before + ' after=' + mini.after);
+    check('全局键转发作用于当前选中行', mini.bumpTargetCorrect === true,
+      'focus=' + mini.focusRow + ' changed=' + JSON.stringify(mini.changedRows));
+    // 核心需求：焦点不在浮窗时照样能调加成
+    check('小条失焦后加成仍然生效', mini.unfocusedWorks === true,
+      'before=' + mini.unfocusedBefore + ' after=' + mini.unfocusedAfter);
+    check('失焦调加成不会撑高小条', mini.unfocusedHeight === 46, 'h=' + mini.unfocusedHeight);
+  }
+
+  // 手改配置后不再有「自动最优」的残留角标（死样式 .cell-manual 应为 0）
+  check('无 cell-manual 残留', (results.label && results.label.afterReset && results.label.afterReset.badges) === 0,
+    'badges=' + (results.label && results.label.afterReset && results.label.afterReset.badges));
+
+  } catch (e) {
+    check('断言块自身未抛异常', false, String((e && e.message) || e));
+    results.assertError = String((e && e.stack) || e);
+  }
+
+  const failed = asserts.filter(a => !a.pass);
+  results.asserts = {
+    total: asserts.length,
+    passed: asserts.length - failed.length,
+    failed: failed.map(a => a.name + (a.detail ? '（' + a.detail + '）' : '')),
+  };
+
+  // 结果落盘：app.exit() 会立刻终止进程，stdout 缓冲可能整段丢失（实测只留下最早的一行）。
+  // 断言明细必须能从文件读到，否则「跑完是绿是红」无从判断。
+  try {
+    fs.mkdirSync(runner.outDir, { recursive: true });
+    fs.writeFileSync(path.join(runner.outDir, 'smoke-result.json'), JSON.stringify(results, null, 2), 'utf8');
+  } catch (e) { /* 写盘失败不影响退出码 */ }
+
+  const summary = (asserts.length - failed.length) + '/' + asserts.length + ' 通过' +
+    (failed.length ? '　失败：' + failed.map(a => a.name + (a.detail ? '（' + a.detail + '）' : '')).join('；') : '');
+  results.assertSummary = summary;
   console.log('[smoke] ' + JSON.stringify(results));
-  app.exit(results.error ? 1 : 0);
+  console.log('[smoke-assert] ' + summary);
+  app.exit(results.error || failed.length ? 1 : 0);
 }
 
 module.exports = { run };
