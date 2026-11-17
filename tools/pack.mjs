@@ -33,9 +33,26 @@ const INCLUDE = [
   /^\/README\.md$/,
   /^\/LICENSE$/,
   /^\/start-debug\.bat$/,
-  /^\/src\//,
-  /^\/tools\//,
+  /^\/src(\/|$)/,
+  /^\/tools(\/|$)/,
 ];
+
+/**
+ * 路径白名单过滤器：返回 true = **排除**（与 @electron/packager 的 ignore 语义一致）。
+ *
+ * 必须是**函数**本身，不能包在数组里：@electron/packager 在 copy-filter.js 里
+ * 用 `typeof opts.ignore !== 'function'` 分流——传数组会走正则分支，
+ * 元素被 file.match(regex) 时 String() 成函数源码再当正则解析，结果一条都匹配不上，
+ * 等于没有过滤（仓库根会被整个复制进 resources/app，只能靠 sanitizePack 事后清顶层兜底）。
+ *
+ * 目录也不能一律排除：fs-extra 的 filter 同时作用于目录，父目录返回 false
+ * 会让整棵子树被跳过。所以白名单里把目录写成 `(/|$)`，
+ * 意图是"这个目录本身要保留以允许递归"，具体文件仍逐条判定。
+ */
+function ignorePath(p) {
+  if (p === '' || p === '/') return false; // 根目录：不能排除，否则复制根本不会开始
+  return !INCLUDE.some(re => re.test(p));
+}
 
 function rmrf(p) { fs.rmSync(p, { recursive: true, force: true }); }
 const mb = b => (b / 1048576).toFixed(1) + ' MB';
@@ -58,7 +75,12 @@ function copyDir(src, dst) {
     const s = path.join(src, entry.name);
     const d = path.join(dst, entry.name);
     if (entry.isDirectory()) copyDir(s, d);
-    else if (entry.isSymbolicLink()) fs.symlinkSync(fs.readlinkSync(s), d);
+    else if (entry.isSymbolicLink()) {
+      // Windows 上非管理员创建符号链接会 EPERM。打包产物里没有需要保留的链接，
+      // 跳过比让整个打包失败更合理（真需要链接的场景应该在源码里显式处理）。
+      try { fs.symlinkSync(fs.readlinkSync(s), d); }
+      catch (e) { console.warn('[pack]   跳过符号链接（' + (e && e.code) + '）：' + s); }
+    }
     else fs.copyFileSync(s, d);
   }
 }
@@ -76,8 +98,14 @@ function manualPack() {
 
   const appDir = path.join(out, 'resources', 'app');
   fs.mkdirSync(appDir, { recursive: true });
-  fs.copyFileSync(path.join(ROOT, 'package.json'), path.join(appDir, 'package.json'));
+  // 与 packager 路径保持同一份白名单（INCLUDE）：两条路径的产物必须一致，
+  // 否则回退产出的包里会缺 LICENSE / README / start-debug.bat，用户拿到的是残包。
+  for (const entry of ['package.json', 'README.md', 'LICENSE', 'start-debug.bat']) {
+    const src = path.join(ROOT, entry);
+    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(appDir, entry));
+  }
   copyDir(path.join(ROOT, 'src'), path.join(appDir, 'src'));
+  if (fs.existsSync(path.join(ROOT, 'tools'))) copyDir(path.join(ROOT, 'tools'), path.join(appDir, 'tools'));
 
   // electron.exe → 星陨斩杀线.exe（同时删除旧名）
   const exe = path.join(out, 'electron.exe');
@@ -116,8 +144,8 @@ async function packagerPack() {
     asar: false,
     prune: true,
     icon: path.join(ROOT, 'src', 'assets', 'icon.ico'),
-    // @electron/packager 的 ignore 是「匹配则排除」，所以传白名单的反集
-    ignore: [(p) => !INCLUDE.some(re => re.test(p))],
+    // @electron/packager 的 ignore 是「匹配则排除」：必须直接传函数，不要包进数组
+    ignore: ignorePath,
     appVersion: readPkg().version,
     // 命中本机缓存 → 打包不联网
     ...(zip ? { electronZipDir: path.dirname(zip) } : {}),
@@ -135,7 +163,9 @@ async function packagerPack() {
 function sanitizePack(outDir) {
   const appDir = path.join(outDir, 'resources', 'app');
   if (!fs.existsSync(appDir)) return [];
-  const KEEP = new Set(['package.json', 'README.md', 'LICENSE', 'start-debug.bat', 'src', 'tools', 'node_modules']);
+  // node_modules 不在白名单里：应用运行时不需要任何依赖（electron API 由运行时提供），
+  // prune 之后残留的只是 @electron / @types 这类空目录壳，留着既无意义也会让人误以为有依赖。
+  const KEEP = new Set(['package.json', 'README.md', 'LICENSE', 'start-debug.bat', 'src', 'tools']);
   const removed = [];
   for (const name of fs.readdirSync(appDir)) {
     if (KEEP.has(name)) continue;
@@ -170,7 +200,7 @@ const KEEP_LOCALES = ['zh-CN.pak', 'zh-TW.pak', 'en-US.pak', 'en-GB.pak'];
  *  - vk_swiftshader.dll / vulkan-1.dll / d3dcompiler_47.dll：GPU 相关。
  *    · d3dcompiler_47.dll 系统自带（C:\Windows\System32 存在同名文件），删 local 副本走系统
  *    · Vulkan/SwiftShader 是「无 GPU 时的软件渲染回退」；有独显/核显的正常机器不加载
- *    删这三项后本机全流程自检通过（6 格出数、明细 20 组、矩阵 20 格、透明窗口不透明占比 0.498）。
+ *    删这几项后本机全流程自检通过（9 格出数、明细 20 组、矩阵 20 格、小条 46px、37 条断言全绿）。
  *    风险：在没有可用 GPU 且需要软件渲染的老机器/虚拟机上可能启动异常——
  *    如需最大兼容性，把下面这一组置空即可。
  */
